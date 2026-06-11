@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import time
 
 import pytest
 from fastapi import WebSocketDisconnect
@@ -49,10 +50,17 @@ def run_forwarder(websocket, session):
 
 def test_forwards_ping_and_multimodal_messages():
     encoded = base64.b64encode(b"data").decode("ascii")
+    jpeg = b"\xff\xd8data\xff\xd9"
+    encoded_jpeg = base64.b64encode(jpeg).decode("ascii")
     websocket = FakeWebSocket([
         json.dumps({"type": "ping", "data": ""}),
         json.dumps({"type": "audio", "data": encoded}),
-        json.dumps({"type": "video_frame", "data": encoded}),
+        json.dumps({
+            "type": "video_frame",
+            "data": encoded_jpeg,
+            "timestamp": time.time_ns() // 1_000_000,
+            "sequence": 1,
+        }),
         json.dumps({"type": "text", "data": "  请描述画面  "}),
     ])
     session = FakeGeminiSession()
@@ -61,7 +69,7 @@ def test_forwards_ping_and_multimodal_messages():
 
     assert websocket.sent == [{"type": "pong", "data": ""}]
     assert session.audio == [b"data"]
-    assert session.video == [b"data"]
+    assert session.video == [jpeg]
     assert session.text == ["请描述画面"]
 
 
