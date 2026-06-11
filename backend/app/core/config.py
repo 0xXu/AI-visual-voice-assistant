@@ -13,8 +13,9 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
     websocket_keepalive_seconds: float = 20.0
-    max_audio_bytes: int = 256 * 1024
-    max_video_bytes: int = 2 * 1024 * 1024
+    max_audio_bytes: int = 8_192
+    max_video_bytes: int = 524_288
+    max_frame_age_ms: int = 2_000
     max_text_chars: int = 2_000
 
     model_config = SettingsConfigDict(
