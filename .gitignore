@@ -1,0 +1,41 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.egg-info/
+dist/
+build/
+
+# Google Cloud — never commit credentials
+application_default_credentials.json
+*-credentials.json
+service-account*.json
+.gcloud/
+
+# Node
+node_modules/
+.next/
+.env.local
+.env.production
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs & test scripts
+*.log
+models_out.txt
+backend/test_*.py
+backend/list_vertex_models.py
+
+# Local code index
+.codegraph/
