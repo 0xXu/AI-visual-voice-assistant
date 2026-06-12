@@ -90,7 +90,7 @@ uv run python -m compileall -q app tests
 Run:
 
 ```bash
-rg -n 'frontend/(app|hooks|lib)|npm |vitest|next build' \
+rg -n 'frontend/(app|hooks|lib)' \
   docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
 ```
 
@@ -101,11 +101,12 @@ Expected: no matches.
 Run:
 
 ```bash
-rg -n 'start_session|stop_session|ping|pong|audio|video_frame|text' \
+rg -n 'ping|pong|audio|video_frame|text|turn_complete' \
   docs/frontend-integration-contract.md
 ```
 
-Expected: all seven message types are present.
+Expected: all currently released message types are present. Planned lifecycle
+messages are listed separately and marked with the PR that activates them.
 
 - [ ] **Step 3: Run backend verification**
 
@@ -137,6 +138,7 @@ git commit -m "docs: define backend frontend boundary"
 - Modify: `backend/.env.example`
 - Modify: `backend/tests/test_messages.py`
 - Modify: `backend/tests/test_config.py`
+- Modify: `docs/frontend-integration-contract.md`
 
 - [ ] **Step 1: Write failing protocol tests**
 
@@ -177,7 +179,8 @@ Requirements:
 uv run pytest -q
 uv run python -m compileall -q app tests
 git add backend/app/api/messages.py backend/app/core/config.py \
-  backend/.env.example backend/tests/test_messages.py backend/tests/test_config.py
+  backend/.env.example backend/tests/test_messages.py backend/tests/test_config.py \
+  docs/frontend-integration-contract.md
 git commit -m "feat: add bounded realtime media protocol"
 ```
 
@@ -193,6 +196,7 @@ git commit -m "feat: add bounded realtime media protocol"
 - Modify: `backend/app/api/websocket.py`
 - Modify: `backend/app/core/config.py`
 - Modify: `backend/.env.example`
+- Modify: `docs/frontend-integration-contract.md`
 
 - [ ] **Step 1: Write failing scheduler tests**
 
@@ -232,7 +236,8 @@ uv run pytest -q
 uv run python -m compileall -q app tests
 git add backend/app/services/input_scheduler.py \
   backend/tests/test_input_scheduler.py backend/app/api/websocket.py \
-  backend/app/core/config.py backend/.env.example
+  backend/app/core/config.py backend/.env.example \
+  docs/frontend-integration-contract.md
 git commit -m "feat: add bounded fair input scheduler"
 ```
 
@@ -250,6 +255,7 @@ git commit -m "feat: add bounded fair input scheduler"
 - Modify: `backend/.env.example`
 - Modify: `backend/tests/test_websocket.py`
 - Modify: `backend/tests/test_config.py`
+- Modify: `docs/frontend-integration-contract.md`
 
 - [ ] **Step 1: Write failing lifecycle tests**
 
@@ -300,7 +306,8 @@ uv run python -m compileall -q app tests
 git add backend/app/services/session_runtime.py \
   backend/tests/test_session_runtime.py backend/app/api/websocket.py \
   backend/app/core/config.py backend/.env.example \
-  backend/tests/test_websocket.py backend/tests/test_config.py
+  backend/tests/test_websocket.py backend/tests/test_config.py \
+  docs/frontend-integration-contract.md
 git commit -m "feat: enforce realtime session lifecycle"
 ```
 
@@ -366,6 +373,7 @@ git commit -m "feat: configure cost safe Gemini Live defaults"
 - Modify: `backend/app/core/config.py`
 - Modify: `backend/.env.example`
 - Modify: `backend/tests/test_websocket.py`
+- Modify: `docs/frontend-integration-contract.md`
 
 - [ ] **Step 1: Write failing accounting tests**
 
@@ -401,7 +409,7 @@ git add backend/app/services/usage.py backend/tests/test_usage.py \
   backend/app/services/session_runtime.py \
   backend/app/services/gemini_service.py backend/app/api/websocket.py \
   backend/app/core/config.py backend/.env.example \
-  backend/tests/test_websocket.py
+  backend/tests/test_websocket.py docs/frontend-integration-contract.md
 git commit -m "feat: enforce per session usage budget"
 ```
 
