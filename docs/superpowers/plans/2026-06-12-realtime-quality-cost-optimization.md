@@ -213,9 +213,12 @@ git commit -m "feat: add bounded realtime media protocol"
 - Modify: `backend/app/api/websocket.py`
 - Modify: `backend/app/core/config.py`
 - Modify: `backend/.env.example`
+- Modify: `backend/tests/test_config.py`
+- Modify: `backend/tests/test_websocket.py`
 - Modify: `docs/frontend-integration-contract.md`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
-- [ ] **Step 1: Write failing scheduler tests**
+- [x] **Step 1: Write failing scheduler tests**
 
 Cover:
 
@@ -224,17 +227,18 @@ async def test_audio_and_text_are_bounded(): ...
 async def test_new_video_replaces_pending_video(): ...
 async def test_regressing_video_sequence_is_rejected(): ...
 async def test_video_is_not_starved_by_continuous_audio(): ...
-async def test_stop_remains_responsive_when_queues_are_full(): ...
+async def test_reader_remains_responsive_when_queues_are_full(): ...
 async def test_close_is_race_safe_and_has_a_hard_timeout(): ...
 ```
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 ```bash
-(cd backend && uv run pytest tests/test_input_scheduler.py -q)
+(cd backend && uv run pytest tests/test_input_scheduler.py \
+  tests/test_websocket.py tests/test_config.py -q)
 ```
 
-- [ ] **Step 3: Implement scheduler semantics**
+- [x] **Step 3: Implement scheduler semantics**
 
 Requirements:
 
@@ -245,15 +249,16 @@ Requirements:
 - Shutdown wakes blocked producers, propagates drain failures, and has a hard timeout.
 - The WebSocket remains the only task reading client messages.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 (cd backend && uv run pytest -q)
 (cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/input_scheduler.py \
   backend/tests/test_input_scheduler.py backend/app/api/websocket.py \
-  backend/app/core/config.py backend/.env.example \
-  docs/frontend-integration-contract.md
+  backend/app/core/config.py backend/.env.example backend/tests/test_config.py \
+  backend/tests/test_websocket.py docs/frontend-integration-contract.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
 git commit -m "feat: add bounded fair input scheduler"
 ```
 

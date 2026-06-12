@@ -1,4 +1,4 @@
-from pydantic import PositiveInt, SecretStr
+from pydantic import PositiveFloat, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     max_video_bytes: PositiveInt = 524_288
     max_frame_age_ms: PositiveInt = 2_000
     max_text_chars: PositiveInt = 2_000
+    audio_queue_capacity: PositiveInt = 32
+    text_queue_capacity: PositiveInt = 8
+    scheduler_shutdown_timeout_seconds: PositiveFloat = 1.0
 
     model_config = SettingsConfigDict(
         env_file=".env",

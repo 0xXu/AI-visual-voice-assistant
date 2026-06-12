@@ -8,9 +8,13 @@ from starlette.websockets import WebSocketState
 from app.api.messages import ClientMessageError, parse_client_message
 from app.core.config import ConfigurationError, settings
 from app.services.gemini_service import GeminiLiveService, GeminiSession
+from app.services.input_scheduler import InputScheduler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_AUDIO_BACKPRESSURE_ERROR = "音频输入处理繁忙，请稍后重试"
+_TEXT_BACKPRESSURE_ERROR = "文本输入处理繁忙，请稍后重试"
 
 
 async def _send_error(websocket: WebSocket, message: str) -> None:
@@ -28,27 +32,72 @@ async def _forward_gemini_responses(
 
 async def _forward_client_messages(
     websocket: WebSocket,
-    session: GeminiSession,
+    scheduler: InputScheduler,
 ) -> None:
-    while True:
-        raw_message = await websocket.receive_text()
-        try:
-            message = parse_client_message(raw_message, settings)
-        except ClientMessageError as exc:
-            logger.warning("收到无效客户端消息：%s", exc)
-            await _send_error(websocket, str(exc))
-            continue
+    pending_audio: asyncio.Task[None] | None = None
+    pending_text: asyncio.Task[None] | None = None
 
-        if message.type == "ping":
-            await websocket.send_json({"type": "pong", "data": ""})
-        elif message.type == "pong":
-            continue
-        elif message.type == "audio":
-            await session.send_audio(message.data)
-        elif message.type == "video_frame":
-            await session.send_video_frame(message.data)
-        elif message.type == "text":
-            await session.send_text(message.data)
+    try:
+        while True:
+            if pending_audio is not None and pending_audio.done():
+                pending_audio.result()
+                pending_audio = None
+            if pending_text is not None and pending_text.done():
+                pending_text.result()
+                pending_text = None
+
+            raw_message = await websocket.receive_text()
+            try:
+                message = parse_client_message(raw_message, settings)
+            except ClientMessageError as exc:
+                logger.warning("收到无效客户端消息：%s", exc)
+                await _send_error(websocket, str(exc))
+                continue
+
+            if message.type == "ping":
+                await websocket.send_json({"type": "pong", "data": ""})
+            elif message.type == "pong":
+                continue
+            elif message.type == "audio":
+                assert isinstance(message.data, bytes)
+                if pending_audio is not None:
+                    await _send_error(
+                        websocket,
+                        _AUDIO_BACKPRESSURE_ERROR,
+                    )
+                    continue
+                pending_audio = asyncio.create_task(
+                    scheduler.submit_audio(message.data),
+                    name="提交音频输入",
+                )
+                await asyncio.sleep(0)
+            elif message.type == "video_frame":
+                assert isinstance(message.data, bytes)
+                assert message.sequence is not None
+                scheduler.submit_video(message.data, message.sequence)
+            elif message.type == "text":
+                assert isinstance(message.data, str)
+                if pending_text is not None:
+                    await _send_error(
+                        websocket,
+                        _TEXT_BACKPRESSURE_ERROR,
+                    )
+                    continue
+                pending_text = asyncio.create_task(
+                    scheduler.submit_text(message.data),
+                    name="提交文本输入",
+                )
+                await asyncio.sleep(0)
+    finally:
+        pending = [
+            task
+            for task in (pending_audio, pending_text)
+            if task is not None
+        ]
+        for task in pending:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 async def _keepalive(websocket: WebSocket) -> None:
@@ -61,11 +110,20 @@ async def _run_session(
     websocket: WebSocket,
     session: GeminiSession,
 ) -> None:
+    scheduler = InputScheduler(
+        audio_capacity=settings.audio_queue_capacity,
+        text_capacity=settings.text_queue_capacity,
+    )
+    scheduler_task = asyncio.create_task(
+        scheduler.run(session),
+        name="发送模型输入",
+    )
     tasks = {
         asyncio.create_task(
-            _forward_client_messages(websocket, session),
+            _forward_client_messages(websocket, scheduler),
             name="接收客户端消息",
         ),
+        scheduler_task,
         asyncio.create_task(
             _forward_gemini_responses(websocket, session),
             name="转发模型响应",
@@ -86,9 +144,33 @@ async def _run_session(
             if exception:
                 raise exception
     finally:
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        scheduler_exception: BaseException | None = None
+        await scheduler.close()
+        try:
+            await asyncio.wait_for(
+                asyncio.shield(scheduler_task),
+                timeout=settings.scheduler_shutdown_timeout_seconds,
+            )
+        except TimeoutError:
+            scheduler_task.cancel()
+        except asyncio.CancelledError:
+            scheduler_task.cancel()
+            raise
+        except Exception as exc:
+            scheduler_exception = exc
+        finally:
+            for task in tasks:
+                if task is not scheduler_task:
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        if (
+            scheduler_exception is None
+            and scheduler_task.done()
+            and not scheduler_task.cancelled()
+        ):
+            scheduler_exception = scheduler_task.exception()
+        if scheduler_exception is not None:
+            raise scheduler_exception
 
 
 @router.websocket("/ws")
