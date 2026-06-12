@@ -38,6 +38,33 @@ SYSTEM_PROMPT = """你是 SightLine，一名实时 AI 视觉对话助手。你�
 - 需要更多视觉信息时，只提出一个最关键的澄清或镜头调整建议。"""
 
 
+def build_live_config(app_settings: Settings) -> types.LiveConnectConfig:
+    return types.LiveConnectConfig(
+        response_modalities=[types.Modality.AUDIO],
+        media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW,
+        system_instruction=SYSTEM_PROMPT,
+        speech_config=types.SpeechConfig(
+            voice_config=types.VoiceConfig(
+                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                    voice_name=app_settings.voice_name
+                )
+            )
+        ),
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
+        realtime_input_config=types.RealtimeInputConfig(
+            automatic_activity_detection=types.AutomaticActivityDetection(
+                disabled=False,
+                prefix_padding_ms=200,
+                silence_duration_ms=800,
+            )
+        ),
+        context_window_compression=types.ContextWindowCompressionConfig(
+            sliding_window=types.SlidingWindow()
+        ),
+    )
+
+
 class GeminiLiveService:
     def __init__(self, app_settings: Settings = settings):
         app_settings.validate_authentication()
@@ -52,26 +79,7 @@ class GeminiLiveService:
     @asynccontextmanager
     async def connect(self) -> AsyncIterator["GeminiSession"]:
         client = self._create_client()
-        config = types.LiveConnectConfig(
-            response_modalities=["AUDIO"],
-            system_instruction=SYSTEM_PROMPT,
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name=self.settings.voice_name
-                    )
-                )
-            ),
-            input_audio_transcription=types.AudioTranscriptionConfig(),
-            output_audio_transcription=types.AudioTranscriptionConfig(),
-            realtime_input_config=types.RealtimeInputConfig(
-                automatic_activity_detection=types.AutomaticActivityDetection(
-                    disabled=False,
-                    prefix_padding_ms=200,
-                    silence_duration_ms=800,
-                )
-            ),
-        )
+        config = build_live_config(self.settings)
 
         try:
             async with client.aio.live.connect(
