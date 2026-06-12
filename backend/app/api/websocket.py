@@ -29,6 +29,43 @@ class SessionEndReason(Enum):
     SESSION_ENDED = "session_ended"
 
 
+def _observe_task_result(task: asyncio.Task[object]) -> None:
+    try:
+        exception = task.exception()
+    except asyncio.CancelledError:
+        return
+    if exception is not None:
+        logger.error(
+            "后台任务延迟结束并发生异常：%s",
+            exception,
+            exc_info=(
+                type(exception),
+                exception,
+                exception.__traceback__,
+            ),
+        )
+
+
+async def _cancel_tasks_with_timeout(
+    tasks: set[asyncio.Task[object]],
+    timeout: float,
+) -> None:
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+
+    done, pending = await asyncio.wait(tasks, timeout=timeout)
+    for task in done:
+        _observe_task_result(task)
+    for task in pending:
+        task.add_done_callback(_observe_task_result)
+    if pending:
+        logger.warning(
+            "取消后台任务超过硬超时，转为异步观察：%s",
+            ", ".join(sorted(task.get_name() for task in pending)),
+        )
+
+
 async def _send_error(websocket: WebSocket, message: str) -> None:
     if websocket.client_state == WebSocketState.CONNECTED:
         await websocket.send_json({"type": "error", "data": message})
@@ -195,13 +232,14 @@ async def _run_session(
         _forward_client_messages(websocket, scheduler, runtime),
         name="接收客户端消息",
     )
+    response_task = asyncio.create_task(
+        _forward_gemini_responses(websocket, session),
+        name="转发模型响应",
+    )
     tasks = {
         client_task,
         scheduler_task,
-        asyncio.create_task(
-            _forward_gemini_responses(websocket, session),
-            name="转发模型响应",
-        ),
+        response_task,
         asyncio.create_task(
             _keepalive(websocket),
             name="连接保活",
@@ -218,12 +256,24 @@ async def _run_session(
             tasks,
             return_when=asyncio.FIRST_COMPLETED,
         )
-        for task in done:
-            exception = task.exception()
-            if exception:
-                raise exception
         if client_task in done:
             end_reason = client_task.result()
+        for task in done:
+            if task is client_task:
+                continue
+            exception = task.exception()
+            if exception:
+                if (
+                    end_reason is SessionEndReason.STOPPED
+                    and isinstance(
+                        exception,
+                        (SessionIdleTimeout, SessionLifetimeExceeded),
+                    )
+                ):
+                    continue
+                raise exception
+        if response_task in done:
+            end_reason = SessionEndReason.STOPPED
     finally:
         scheduler_exception: BaseException | None = None
         await scheduler.close()
@@ -240,10 +290,10 @@ async def _run_session(
         except Exception as exc:
             scheduler_exception = exc
         finally:
-            for task in tasks:
-                if task is not scheduler_task:
-                    task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await _cancel_tasks_with_timeout(
+                tasks,
+                settings.scheduler_shutdown_timeout_seconds,
+            )
         if (
             scheduler_exception is None
             and scheduler_task.done()

@@ -56,6 +56,8 @@ def test_invalid_local_env_does_not_break_test_collection(tmp_path):
         "AUDIO_QUEUE_CAPACITY",
         "TEXT_QUEUE_CAPACITY",
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
+        "SESSION_IDLE_SECONDS",
+        "SESSION_MAX_SECONDS",
     ):
         env.pop(env_name, None)
     backend_dir = os.path.dirname(os.path.dirname(__file__))
@@ -100,6 +102,8 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
         "AUDIO_QUEUE_CAPACITY",
         "TEXT_QUEUE_CAPACITY",
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
+        "SESSION_IDLE_SECONDS",
+        "SESSION_MAX_SECONDS",
     ):
         monkeypatch.delenv(env_name, raising=False)
 
@@ -157,10 +161,12 @@ def test_parses_session_lifecycle_environment(monkeypatch):
         "AUDIO_QUEUE_CAPACITY",
         "TEXT_QUEUE_CAPACITY",
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
+        "SESSION_IDLE_SECONDS",
+        "SESSION_MAX_SECONDS",
     ],
 )
 @pytest.mark.parametrize("value", [0, -1])
-def test_rejects_non_positive_realtime_media_limits_from_environment(
+def test_rejects_non_positive_realtime_settings_from_environment(
     monkeypatch,
     env_name,
     value,

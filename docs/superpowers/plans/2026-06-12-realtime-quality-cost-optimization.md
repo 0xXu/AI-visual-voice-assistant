@@ -275,11 +275,14 @@ git commit -m "feat: add bounded fair input scheduler"
 - Modify: `backend/app/api/websocket.py`
 - Modify: `backend/app/core/config.py`
 - Modify: `backend/.env.example`
+- Modify: `backend/tests/conftest.py`
+- Modify: `backend/tests/test_messages.py`
 - Modify: `backend/tests/test_websocket.py`
 - Modify: `backend/tests/test_config.py`
 - Modify: `docs/frontend-integration-contract.md`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [x] **Step 1: Write failing lifecycle tests**
 
 Cover:
 
@@ -295,14 +298,14 @@ async def test_cleanup_has_a_hard_upper_bound(): ...
 def test_timeout_settings_require_positive_values(): ...
 ```
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 ```bash
 (cd backend && uv run pytest tests/test_session_runtime.py \
   tests/test_websocket.py tests/test_config.py -q)
 ```
 
-- [ ] **Step 3: Implement lifecycle behavior**
+- [x] **Step 3: Implement lifecycle behavior**
 
 Requirements:
 
@@ -316,20 +319,22 @@ Requirements:
 - Natural Gemini stream ending emits a terminal status.
 - Cancellation and task observation have a hard cleanup deadline.
 
-- [ ] **Step 4: Stabilize timing tests**
+- [x] **Step 4: Stabilize timing tests**
 
 Use an injected clock or event-controlled waits for expiry decisions. Do not depend on 10–60 ms wall-clock windows for core assertions.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 (cd backend && uv run pytest -q)
 (cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/session_runtime.py backend/app/api/messages.py \
-  backend/tests/test_session_runtime.py backend/app/api/websocket.py \
-  backend/app/core/config.py backend/.env.example \
+  backend/tests/test_session_runtime.py backend/tests/test_messages.py \
+  backend/app/api/websocket.py backend/app/core/config.py backend/.env.example \
+  backend/tests/conftest.py \
   backend/tests/test_websocket.py backend/tests/test_config.py \
-  docs/frontend-integration-contract.md
+  docs/frontend-integration-contract.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
 git commit -m "feat: enforce realtime session lifecycle"
 ```
 

@@ -11,10 +11,13 @@ from app.services.session_runtime import (
 
 def test_idle_expiration_raises_typed_exception():
     async def scenario():
+        now = 100.0
         runtime = SessionRuntime(
-            idle_seconds=0.01,
-            max_seconds=1.0,
+            idle_seconds=45.0,
+            max_seconds=600.0,
+            clock=lambda: now,
         )
+        now = 145.0
 
         with pytest.raises(SessionIdleTimeout):
             await runtime.wait_until_expired()
@@ -24,36 +27,38 @@ def test_idle_expiration_raises_typed_exception():
 
 def test_activity_refreshes_idle_deadline():
     async def scenario():
+        now = 100.0
         runtime = SessionRuntime(
-            idle_seconds=0.03,
-            max_seconds=1.0,
+            idle_seconds=45.0,
+            max_seconds=600.0,
+            clock=lambda: now,
         )
-        waiter = asyncio.create_task(runtime.wait_until_expired())
-
-        await asyncio.sleep(0.02)
+        now = 130.0
         runtime.record_activity()
-        await asyncio.sleep(0.02)
-        assert not waiter.done()
+        now = 175.0
 
         with pytest.raises(SessionIdleTimeout):
-            await waiter
+            await runtime.wait_until_expired()
+
+        assert runtime.last_activity == 130.0
 
     asyncio.run(scenario())
 
 
 def test_max_lifetime_is_not_extended_by_activity():
     async def scenario():
+        now = 100.0
         runtime = SessionRuntime(
-            idle_seconds=0.05,
-            max_seconds=0.06,
+            idle_seconds=45.0,
+            max_seconds=60.0,
+            clock=lambda: now,
         )
-        waiter = asyncio.create_task(runtime.wait_until_expired())
-
-        await asyncio.sleep(0.04)
+        now = 150.0
         runtime.record_activity()
+        now = 160.0
 
         with pytest.raises(SessionLifetimeExceeded):
-            await waiter
+            await runtime.wait_until_expired()
 
         assert runtime.last_activity > runtime.started_at
 

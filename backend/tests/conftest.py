@@ -10,6 +10,8 @@ _TEST_SETTINGS_DEFAULTS = {
     "MAX_VIDEO_BYTES": "524288",
     "MAX_FRAME_AGE_MS": "2000",
     "MAX_TEXT_CHARS": "2000",
+    "SESSION_IDLE_SECONDS": "45.0",
+    "SESSION_MAX_SECONDS": "600.0",
 }
 
 for env_name, value in _TEST_SETTINGS_DEFAULTS.items():
