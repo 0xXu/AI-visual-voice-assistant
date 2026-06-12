@@ -152,6 +152,7 @@ git commit -m "docs: define backend frontend boundary"
 - Modify: `backend/tests/test_config.py`
 - Modify: `backend/tests/test_websocket.py`
 - Modify: `docs/frontend-integration-contract.md`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
 - [ ] **Step 1: Write failing protocol tests**
 
@@ -193,7 +194,8 @@ Requirements:
 git add backend/app/api/messages.py backend/app/core/config.py \
   backend/.env.example backend/tests/test_messages.py backend/tests/test_config.py \
   backend/tests/test_websocket.py \
-  docs/frontend-integration-contract.md
+  docs/frontend-integration-contract.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
 git commit -m "feat: add bounded realtime media protocol"
 ```
 

@@ -33,6 +33,17 @@ def test_parses_audio_bytes(settings):
     assert message.data == b"\x01\x02"
 
 
+def test_allows_even_audio_at_max_bytes(settings):
+    audio = b"\x01\x02" * (settings.max_audio_bytes // 2)
+
+    message = parse_client_message(
+        json.dumps({"type": "audio", "data": encode(audio)}),
+        settings,
+    )
+
+    assert message.data == audio
+
+
 @pytest.mark.parametrize("message_type", ["start_session", "stop_session"])
 def test_rejects_unreleased_lifecycle_messages(settings, message_type):
     with pytest.raises(ClientMessageError, match="不支持"):
@@ -104,6 +115,43 @@ def test_parses_jpeg_video_with_timestamp_and_sequence(settings):
     assert message.data == jpeg
     assert message.timestamp_ms == 9_000
     assert message.sequence == 7
+
+
+def test_allows_jpeg_video_at_max_bytes(settings):
+    jpeg = b"\xff\xd8" + b"\x00" * (settings.max_video_bytes - 4) + b"\xff\xd9"
+
+    message = parse_client_message(
+        json.dumps(
+            {
+                "type": "video_frame",
+                "data": encode(jpeg),
+                "timestamp": 1_000,
+                "sequence": 1,
+            }
+        ),
+        settings,
+        now_ms=1_000,
+    )
+
+    assert message.data == jpeg
+
+
+def test_rejects_jpeg_video_one_byte_over_max(settings):
+    jpeg = b"\xff\xd8" + b"\x00" * (settings.max_video_bytes - 3) + b"\xff\xd9"
+
+    with pytest.raises(ClientMessageError, match="过大"):
+        parse_client_message(
+            json.dumps(
+                {
+                    "type": "video_frame",
+                    "data": encode(jpeg),
+                    "timestamp": 1_000,
+                    "sequence": 1,
+                }
+            ),
+            settings,
+            now_ms=1_000,
+        )
 
 
 def test_rejects_non_jpeg_video(settings):
@@ -228,6 +276,17 @@ def test_rejects_blank_or_oversized_text(settings):
             json.dumps({"type": "text", "data": "12345678901"}),
             settings,
         )
+
+
+def test_allows_text_at_max_chars(settings):
+    text = "x" * settings.max_text_chars
+
+    message = parse_client_message(
+        json.dumps({"type": "text", "data": text}),
+        settings,
+    )
+
+    assert message.data == text
 
 
 def test_rejects_unknown_message_type(settings):
