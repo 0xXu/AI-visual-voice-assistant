@@ -56,6 +56,8 @@ def test_invalid_local_env_does_not_break_test_collection(tmp_path):
         "AUDIO_QUEUE_CAPACITY",
         "TEXT_QUEUE_CAPACITY",
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
+        "SESSION_IDLE_SECONDS",
+        "SESSION_MAX_SECONDS",
     ):
         env.pop(env_name, None)
     backend_dir = os.path.dirname(os.path.dirname(__file__))
@@ -100,6 +102,8 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
         "AUDIO_QUEUE_CAPACITY",
         "TEXT_QUEUE_CAPACITY",
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
+        "SESSION_IDLE_SECONDS",
+        "SESSION_MAX_SECONDS",
     ):
         monkeypatch.delenv(env_name, raising=False)
 
@@ -112,6 +116,8 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
     assert settings.audio_queue_capacity == 32
     assert settings.text_queue_capacity == 8
     assert settings.scheduler_shutdown_timeout_seconds == 1.0
+    assert settings.session_idle_seconds == 45.0
+    assert settings.session_max_seconds == 600.0
 
 
 def test_parses_scheduler_queue_and_shutdown_environment(monkeypatch):
@@ -131,6 +137,18 @@ def test_env_example_documents_scheduler_limits():
 
     assert "TEXT_QUEUE_CAPACITY=8" in env_example
     assert "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS=1.0" in env_example
+    assert "SESSION_IDLE_SECONDS=45.0" in env_example
+    assert "SESSION_MAX_SECONDS=600.0" in env_example
+
+
+def test_parses_session_lifecycle_environment(monkeypatch):
+    monkeypatch.setenv("SESSION_IDLE_SECONDS", "12.5")
+    monkeypatch.setenv("SESSION_MAX_SECONDS", "90")
+
+    settings = Settings(gemini_api_key="test-key", _env_file=None)
+
+    assert settings.session_idle_seconds == 12.5
+    assert settings.session_max_seconds == 90.0
 
 
 @pytest.mark.parametrize(
@@ -143,10 +161,12 @@ def test_env_example_documents_scheduler_limits():
         "AUDIO_QUEUE_CAPACITY",
         "TEXT_QUEUE_CAPACITY",
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
+        "SESSION_IDLE_SECONDS",
+        "SESSION_MAX_SECONDS",
     ],
 )
 @pytest.mark.parametrize("value", [0, -1])
-def test_rejects_non_positive_realtime_media_limits_from_environment(
+def test_rejects_non_positive_realtime_settings_from_environment(
     monkeypatch,
     env_name,
     value,

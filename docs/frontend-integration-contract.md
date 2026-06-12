@@ -36,7 +36,7 @@ Protocol stages:
 | 0 | Legacy protocol before bounded media |
 | 1 | Released: bounded media validation |
 | 2 | Released: bounded fair scheduler semantics |
-| 3 | Planned: explicit session lifecycle |
+| 3 | Released: explicit session lifecycle |
 | 5 | Planned: usage and budget events |
 | 6 | Planned: interruption event |
 | 7 | Planned: GoAway and resumption events |
@@ -58,17 +58,36 @@ All messages are UTF-8 JSON objects. Binary media is Base64-encoded in the
 
 ### Connection Lifecycle
 
-The current backend creates Gemini Live immediately after accepting the
-browser WebSocket:
+At protocol stage 3, the browser WebSocket and Gemini cloud session have
+separate lifecycles:
 
 1. Frontend opens the WebSocket.
-2. Backend creates Gemini Live.
-3. Backend sends `status: connected`.
+2. Frontend sends `start_session` after explicit user action.
+3. Backend creates Gemini Live and sends `status: connected`.
 4. Frontend sends text, audio, and video messages.
-5. When either side ends the live session, the backend closes the browser
-   WebSocket.
+5. Frontend sends `stop_session`, or the session reaches a terminal condition.
+6. Backend sends a terminal status and releases Gemini Live.
+7. The same browser WebSocket may start another cloud session.
 
-There is currently no `start_session` or `stop_session` message.
+Gemini Live is not created before a valid `start_session`. Before start, the
+backend accepts `ping` and `pong`; other valid message types receive the
+Chinese error `请先发送 start_session`.
+
+### Client Start Session
+
+```json
+{"type":"start_session","data":""}
+```
+
+Sending this while a cloud session is already active is accepted as a no-op.
+
+### Client Stop Session
+
+```json
+{"type":"stop_session","data":""}
+```
+
+User stop takes priority if a timeout completes in the same event-loop turn.
 
 ### Client Ping
 
@@ -164,6 +183,23 @@ At protocol stage 2:
 
 The frontend may begin sending media after this event.
 
+### Server Terminal Status
+
+```json
+{"type":"status","data":"stopped"}
+```
+
+Terminal values:
+
+| Value | Meaning | Frontend action |
+|---|---|---|
+| `stopped` | User stop or Gemini response stream ended naturally | Stop media; allow restart |
+| `idle_timeout` | No validated and accepted input for 45 seconds by default | Stop media; allow restart |
+| `max_duration` | Session reached 600 seconds by default | Stop media; allow restart |
+
+The backend keeps the browser WebSocket open after a terminal status. Idle
+time refreshes only after validated input is accepted by the scheduler.
+
 ### Server Error
 
 ```json
@@ -207,12 +243,18 @@ little-endian, mono PCM at 24 kHz.
 The current model response turn has finished. The frontend may use this event
 to finalize transcript or playback UI state.
 
+## Stage 2 Compatibility
+
+Deployments reporting protocol stage 2 retain the pre-lifecycle behavior:
+Gemini Live is created immediately, `start_session` and `stop_session` do not
+exist, and ending the live session closes the browser WebSocket. Stage 2 still
+provides the bounded fair scheduler documented above.
+
 ## Stage 1 Compatibility
 
-Stage 2 preserves every stage 1 message shape and validation rule. A stage 1
-frontend can connect to a stage 2 backend without adding lifecycle messages.
-Gemini Live is still created immediately, and ending the live session still
-closes the browser WebSocket.
+Deployments reporting protocol stage 1 retain the pre-lifecycle behavior and
+bounded media validation. Gemini Live is created immediately, and ending the
+live session closes the browser WebSocket.
 
 Deployments reporting protocol stage 1 provide bounded media validation but
 do not promise stage 2 queue bounds, backpressure errors, latest-only video,
@@ -237,43 +279,6 @@ GitHub merge state.
 ---
 
 ## Planned Protocol Evolution
-
-### Task 3: Explicit Session Lifecycle
-
-Available only when the deployment reports protocol stage 3 or later.
-
-The browser WebSocket and Gemini cloud session become separate:
-
-1. Frontend opens the WebSocket.
-2. Frontend sends `start_session` after explicit user action.
-3. Backend creates Gemini Live and sends `status: connected`.
-4. Frontend sends media.
-5. Frontend sends `stop_session`.
-6. Backend sends `status: stopped`.
-7. The same browser WebSocket may start another cloud session.
-
-Target start message:
-
-```json
-{"type":"start_session","data":""}
-```
-
-Target stop message:
-
-```json
-{"type":"stop_session","data":""}
-```
-
-Target terminal statuses:
-
-| Value | Meaning | Frontend action |
-|---|---|---|
-| `stopped` | User stop or model stream ended | Stop media; allow restart |
-| `idle_timeout` | No accepted input for 45 seconds by default | Stop media; allow restart |
-| `max_duration` | Session reached 600 seconds by default | Stop media; allow restart |
-
-At deployed protocol stage 3 or later, keep the browser WebSocket open after
-a terminal status.
 
 ### Task 5: Usage And Budget
 
