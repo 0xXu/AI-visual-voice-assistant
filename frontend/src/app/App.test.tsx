@@ -29,6 +29,7 @@ describe("App", () => {
 
     render(<App />);
 
+    expect(screen.getByText("EchoSight")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "开始视觉对话" }),
     ).toBeInTheDocument();
