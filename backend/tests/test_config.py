@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -52,6 +53,9 @@ def test_invalid_local_env_does_not_break_test_collection(tmp_path):
         "MAX_VIDEO_BYTES",
         "MAX_FRAME_AGE_MS",
         "MAX_TEXT_CHARS",
+        "AUDIO_QUEUE_CAPACITY",
+        "TEXT_QUEUE_CAPACITY",
+        "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
     ):
         env.pop(env_name, None)
     backend_dir = os.path.dirname(os.path.dirname(__file__))
@@ -93,6 +97,9 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
         "MAX_VIDEO_BYTES",
         "MAX_FRAME_AGE_MS",
         "MAX_TEXT_CHARS",
+        "AUDIO_QUEUE_CAPACITY",
+        "TEXT_QUEUE_CAPACITY",
+        "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
     ):
         monkeypatch.delenv(env_name, raising=False)
 
@@ -103,6 +110,27 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
     assert settings.max_frame_age_ms == 2_000
     assert settings.max_text_chars == 2_000
     assert settings.audio_queue_capacity == 32
+    assert settings.text_queue_capacity == 8
+    assert settings.scheduler_shutdown_timeout_seconds == 1.0
+
+
+def test_parses_scheduler_queue_and_shutdown_environment(monkeypatch):
+    monkeypatch.setenv("TEXT_QUEUE_CAPACITY", "3")
+    monkeypatch.setenv("SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS", "0.25")
+
+    settings = Settings(gemini_api_key="test-key", _env_file=None)
+
+    assert settings.text_queue_capacity == 3
+    assert settings.scheduler_shutdown_timeout_seconds == 0.25
+
+
+def test_env_example_documents_scheduler_limits():
+    env_example = (
+        Path(__file__).parents[1] / ".env.example"
+    ).read_text(encoding="utf-8")
+
+    assert "TEXT_QUEUE_CAPACITY=8" in env_example
+    assert "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS=1.0" in env_example
 
 
 @pytest.mark.parametrize(
@@ -113,6 +141,8 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
         "MAX_FRAME_AGE_MS",
         "MAX_TEXT_CHARS",
         "AUDIO_QUEUE_CAPACITY",
+        "TEXT_QUEUE_CAPACITY",
+        "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
     ],
 )
 @pytest.mark.parametrize("value", [0, -1])

@@ -68,6 +68,7 @@ async def _run_session(
 ) -> None:
     scheduler = InputScheduler(
         audio_capacity=settings.audio_queue_capacity,
+        text_capacity=settings.text_queue_capacity,
     )
     scheduler_task = asyncio.create_task(
         scheduler.run(session),
@@ -100,10 +101,23 @@ async def _run_session(
                 raise exception
     finally:
         await scheduler.close()
-        for task in tasks:
-            if task is not scheduler_task:
-                task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await asyncio.wait_for(
+                asyncio.shield(scheduler_task),
+                timeout=settings.scheduler_shutdown_timeout_seconds,
+            )
+        except TimeoutError:
+            scheduler_task.cancel()
+        except asyncio.CancelledError:
+            scheduler_task.cancel()
+            raise
+        except Exception:
+            pass
+        finally:
+            for task in tasks:
+                if task is not scheduler_task:
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 @router.websocket("/ws")
