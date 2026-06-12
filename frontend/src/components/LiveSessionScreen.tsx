@@ -2,11 +2,16 @@ import { useEffect, useMemo, useRef } from "react";
 import type { SessionState } from "../app/session-reducer";
 import { ControlDock } from "./ControlDock";
 import { StatusBadge } from "./StatusBadge";
+import { TranscriptDrawer } from "./TranscriptDrawer";
 
 interface LiveSessionScreenProps {
   stream: MediaStream;
   state: SessionState;
   onVideoReady: (video: HTMLVideoElement) => void;
+  protocolStage: number;
+  onOpenTranscript: () => void;
+  onCloseTranscript: () => void;
+  onSendText: (text: string) => void;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onFlipCamera: () => void;
@@ -17,6 +22,10 @@ export function LiveSessionScreen({
   stream,
   state,
   onVideoReady,
+  protocolStage,
+  onOpenTranscript,
+  onCloseTranscript,
+  onSendText,
   onToggleMute,
   onToggleVideo,
   onFlipCamera,
@@ -52,9 +61,17 @@ export function LiveSessionScreen({
         </div>
       </header>
 
-      <button className="latest-card" type="button">
+      <button className="latest-card" type="button" onClick={onOpenTranscript}>
         <span>{latestMessage?.role === "assistant" ? "AI" : "你"}</span>
         {latestMessage?.text || "实时会话已准备好"}
+      </button>
+
+      <button
+        className="transcript-open-button"
+        type="button"
+        onClick={onOpenTranscript}
+      >
+        查看对话记录
       </button>
 
       <ControlDock
@@ -64,6 +81,14 @@ export function LiveSessionScreen({
         onToggleVideo={onToggleVideo}
         onFlipCamera={onFlipCamera}
         onStop={onStop}
+      />
+
+      <TranscriptDrawer
+        open={state.transcriptOpen}
+        messages={state.messages}
+        protocolStage={protocolStage}
+        onClose={onCloseTranscript}
+        onSendText={onSendText}
       />
     </main>
   );

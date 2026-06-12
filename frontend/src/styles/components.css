@@ -870,6 +870,176 @@
   color: var(--color-warning);
 }
 
+.transcript-open-button {
+  position: absolute;
+  bottom: 208px;
+  left: var(--space-5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-overlay);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.transcript-drawer {
+  position: absolute;
+  z-index: 5;
+  right: var(--space-5);
+  bottom: 96px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: min(420px, calc(100vw - 40px));
+  max-height: min(560px, calc(100svh - 132px));
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(var(--color-surface-rgb), 0.92);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text);
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.transcript-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.transcript-drawer__header div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.transcript-drawer__header span {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.transcript-drawer__header strong {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.transcript-drawer__header button,
+.transcript-composer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.transcript-drawer__messages {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.transcript-empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.transcript-message {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.transcript-message[data-role="user"] {
+  justify-items: end;
+}
+
+.transcript-message span {
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.transcript-message p {
+  max-width: 88%;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(var(--color-bg-rgb), 0.54);
+  line-height: 1.7;
+}
+
+.transcript-message[data-role="user"] p {
+  background: rgba(var(--color-accent-rgb), 0.16);
+}
+
+.transcript-composer {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.transcript-composer label {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.transcript-composer label > span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.transcript-composer textarea {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(var(--color-bg-rgb), 0.62);
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.6;
+  padding: var(--space-3);
+}
+
+.transcript-composer button {
+  gap: var(--space-2);
+  justify-self: end;
+  padding: 0 var(--space-4);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-weight: 700;
+}
+
+.transcript-composer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 @media (max-width: 639px) {
   .live-header {
     align-items: flex-start;
@@ -890,6 +1060,23 @@
     right: var(--space-4);
     bottom: 104px;
     left: var(--space-4);
+  }
+
+  .transcript-open-button {
+    bottom: 196px;
+    left: var(--space-4);
+  }
+
+  .transcript-drawer {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 70svh;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 8px 8px 0 0;
   }
 
   .control-dock {

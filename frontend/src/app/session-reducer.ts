@@ -93,6 +93,34 @@ function appendAssistantText(
   return [...state.messages, createMessage(state, "assistant", text, "voice", false)];
 }
 
+function startVoiceTurn(state: SessionState): TranscriptMessage[] {
+  const lastMessage = state.messages.at(-1);
+
+  if (lastMessage?.role === "user" && !lastMessage.complete) {
+    return state.messages;
+  }
+
+  return [
+    ...state.messages,
+    createMessage(state, "user", "语音提问", "voice", false),
+  ];
+}
+
+function appendUserVoiceText(
+  state: SessionState,
+  text: string,
+): TranscriptMessage[] {
+  const lastMessage = state.messages.at(-1);
+
+  if (lastMessage?.role === "user" && !lastMessage.complete) {
+    const nextText =
+      lastMessage.text === "语音提问" ? text : `${lastMessage.text}${text}`;
+    return [...state.messages.slice(0, -1), { ...lastMessage, text: nextText }];
+  }
+
+  return [...state.messages, createMessage(state, "user", text, "voice", false)];
+}
+
 export function sessionReducer(
   state: SessionState,
   action: SessionAction,
@@ -108,18 +136,12 @@ export function sessionReducer(
       return {
         ...state,
         phase: "listening",
-        messages: [
-          ...state.messages,
-          createMessage(state, "user", "语音提问", "voice", false),
-        ],
+        messages: startVoiceTurn(state),
       };
     case "USER_TEXT":
       return {
         ...state,
-        messages: [
-          ...state.messages,
-          createMessage(state, "user", action.text, "voice", true),
-        ],
+        messages: appendUserVoiceText(state, action.text),
       };
     case "TEXT_SENT":
       return {

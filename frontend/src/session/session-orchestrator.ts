@@ -38,6 +38,7 @@ export class SessionOrchestrator implements SessionControls {
   private connected = false;
   private muted = false;
   private videoPaused = false;
+  private voiceTurnActive = false;
 
   constructor(private readonly options: SessionOrchestratorOptions) {}
 
@@ -140,6 +141,7 @@ export class SessionOrchestrator implements SessionControls {
         this.options.dispatch({ type: "MODEL_AUDIO_STARTED" });
         break;
       case "turn_complete":
+        this.voiceTurnActive = false;
         this.options.dispatch({ type: "TURN_COMPLETE" });
         break;
       case "interrupted":
@@ -172,6 +174,10 @@ export class SessionOrchestrator implements SessionControls {
       this.audioCapture = new AudioCapture({
         stream: this.stream,
         onChunk: (data) => {
+          if (!this.voiceTurnActive) {
+            this.voiceTurnActive = true;
+            this.options.dispatch({ type: "VOICE_TURN_STARTED" });
+          }
           this.client?.send({ type: "audio", data });
         },
       });
