@@ -243,6 +243,51 @@ def test_submissions_are_rejected_after_close():
     asyncio.run(scenario())
 
 
+def test_blocked_audio_submission_loses_to_close_and_is_not_queued():
+    async def scenario():
+        scheduler = InputScheduler(audio_capacity=1)
+        await scheduler.submit_audio(b"first")
+        blocked_submit = asyncio.create_task(
+            scheduler.submit_audio(b"second")
+        )
+        await asyncio.sleep(0)
+        assert not blocked_submit.done()
+
+        assert await scheduler.take_audio() == b"first"
+        await scheduler.close()
+
+        with pytest.raises(input_scheduler.SchedulerClosed):
+            await blocked_submit
+
+        session = FakeSession()
+        await scheduler.run(session)
+        assert session.calls == []
+
+    asyncio.run(scenario())
+
+
+def test_blocked_text_submission_loses_to_close_and_is_not_queued():
+    async def scenario():
+        scheduler = InputScheduler(audio_capacity=1, text_capacity=1)
+        await scheduler.submit_text("first")
+        blocked_submit = asyncio.create_task(
+            scheduler.submit_text("second")
+        )
+        await asyncio.sleep(0)
+        assert not blocked_submit.done()
+
+        await scheduler.close()
+
+        with pytest.raises(input_scheduler.SchedulerClosed):
+            await blocked_submit
+
+        session = FakeSession()
+        await scheduler.run(session)
+        assert session.calls == [("text", "first")]
+
+    asyncio.run(scenario())
+
+
 def test_close_drains_queued_work_and_worker_exits():
     async def scenario():
         scheduler = InputScheduler(audio_capacity=4)

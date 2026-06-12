@@ -1,4 +1,5 @@
 import asyncio
+from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -25,21 +26,21 @@ class InputScheduler:
             raise ValueError("audio_capacity must be positive")
         if text_capacity <= 0:
             raise ValueError("text_capacity must be positive")
-        self._audio: asyncio.Queue[bytes] = asyncio.Queue(audio_capacity)
-        self._text: asyncio.Queue[str] = asyncio.Queue(text_capacity)
+        self._audio: deque[bytes] = deque()
+        self._text: deque[str] = deque()
+        self._audio_capacity = audio_capacity
+        self._text_capacity = text_capacity
+        self._condition = asyncio.Condition()
         self._latest_video: PendingVideo | None = None
         self._highest_seen_video_sequence: int | None = None
         self._wake = asyncio.Event()
-        self._closed_event = asyncio.Event()
         self._closed = False
 
     async def submit_audio(self, data: bytes) -> None:
-        await self._put_unless_closed(self._audio, data)
-        self._wake.set()
+        await self._submit(self._audio, self._audio_capacity, data)
 
     async def submit_text(self, text: str) -> None:
-        await self._put_unless_closed(self._text, text)
-        self._wake.set()
+        await self._submit(self._text, self._text_capacity, text)
 
     def submit_video(self, data: bytes, sequence: int) -> None:
         self._raise_if_closed()
@@ -52,7 +53,14 @@ class InputScheduler:
             self._wake.set()
 
     async def take_audio(self) -> bytes:
-        return await self._audio.get()
+        async with self._condition:
+            while not self._audio and not self._closed:
+                await self._condition.wait()
+            if not self._audio:
+                raise SchedulerClosed("input scheduler is closed")
+            audio = self._audio.popleft()
+            self._condition.notify_all()
+            return audio
 
     def take_latest_video(self) -> tuple[bytes, int] | None:
         if self._latest_video is None:
@@ -62,8 +70,9 @@ class InputScheduler:
         return pending.data, pending.sequence
 
     async def close(self) -> None:
-        self._closed = True
-        self._closed_event.set()
+        async with self._condition:
+            self._closed = True
+            self._condition.notify_all()
         self._wake.set()
 
     async def run(self, session: "GeminiSession") -> None:
@@ -71,16 +80,14 @@ class InputScheduler:
             self._wake.clear()
 
             for _ in range(self._TEXT_BATCH_SIZE):
-                try:
-                    text = self._text.get_nowait()
-                except asyncio.QueueEmpty:
+                text = await self._take_nowait(self._text)
+                if text is None:
                     break
                 await session.send_text(text)
 
             for _ in range(self._AUDIO_BATCH_SIZE):
-                try:
-                    audio = self._audio.get_nowait()
-                except asyncio.QueueEmpty:
+                audio = await self._take_nowait(self._audio)
+                if audio is None:
                     break
                 await session.send_audio(audio)
 
@@ -96,38 +103,29 @@ class InputScheduler:
 
             await self._wake.wait()
 
-    async def _put_unless_closed(
+    async def _submit(
         self,
-        queue: asyncio.Queue[bytes] | asyncio.Queue[str],
+        queue: deque[bytes] | deque[str],
+        capacity: int,
         item: bytes | str,
     ) -> None:
-        self._raise_if_closed()
-        try:
-            queue.put_nowait(item)
-            return
-        except asyncio.QueueFull:
-            pass
+        async with self._condition:
+            while len(queue) >= capacity and not self._closed:
+                await self._condition.wait()
+            self._raise_if_closed()
+            queue.append(item)
+        self._wake.set()
 
-        put_task = asyncio.create_task(queue.put(item))
-        close_task = asyncio.create_task(self._closed_event.wait())
-        try:
-            done, _ = await asyncio.wait(
-                {put_task, close_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            if put_task in done:
-                await put_task
-                return
-            raise SchedulerClosed("input scheduler is closed")
-        finally:
-            for task in (put_task, close_task):
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(
-                put_task,
-                close_task,
-                return_exceptions=True,
-            )
+    async def _take_nowait(
+        self,
+        queue: deque[bytes] | deque[str],
+    ) -> bytes | str | None:
+        async with self._condition:
+            if not queue:
+                return None
+            item = queue.popleft()
+            self._condition.notify_all()
+            return item
 
     def _raise_if_closed(self) -> None:
         if self._closed:
@@ -135,7 +133,7 @@ class InputScheduler:
 
     def _has_pending_work(self) -> bool:
         return (
-            not self._text.empty()
-            or not self._audio.empty()
+            bool(self._text)
+            or bool(self._audio)
             or self._latest_video is not None
         )
