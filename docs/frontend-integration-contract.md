@@ -38,7 +38,7 @@ Protocol stages:
 | 2 | Released: bounded fair scheduler semantics |
 | 3 | Released: explicit session lifecycle |
 | 5 | Released: usage and budget events |
-| 6 | Planned: interruption event |
+| 6 | Released: interruption event |
 | 7 | Planned: GoAway and resumption events |
 
 ## Endpoint
@@ -295,6 +295,19 @@ Append `data` to the model transcript.
 `data` is Base64-encoded model audio. Decode and play it as signed 16-bit
 little-endian, mono PCM at 24 kHz.
 
+### Stage 6 Server Interruption
+
+```json
+{"type":"interrupted","data":""}
+```
+
+When Gemini reports an interruption, the backend emits this event at most
+once for that Gemini service message and before any usage, text, audio, or
+turn-complete event translated from the same message.
+
+On receipt, immediately stop current model playback and clear queued model
+audio. Microphone capture may continue.
+
 ### Server Turn Complete
 
 ```json
@@ -340,17 +353,6 @@ GitHub merge state.
 ---
 
 ## Planned Protocol Evolution
-
-### Task 6: Interruption
-
-Available only when the deployment reports protocol stage 6 or later.
-
-```json
-{"type":"interrupted","data":""}
-```
-
-On receipt, immediately stop current model playback and clear queued model
-audio. Microphone capture may continue.
 
 ### Task 7: GoAway And Resumption
 

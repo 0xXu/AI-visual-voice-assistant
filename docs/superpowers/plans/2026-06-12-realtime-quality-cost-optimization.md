@@ -468,33 +468,45 @@ git commit -m "Task5：增加会话用量统计与 token 预算"
 
 ### Task 6: Forward Server Interruption Events
 
-**PR title:** `feat: expose Gemini interruption events to clients`
+**PR title:** `feat: 转发 Gemini 用户打断事件`
 
 **Files:**
 - Modify: `backend/app/services/gemini_service.py`
 - Modify: `backend/tests/test_gemini_service.py`
 - Modify: `docs/frontend-integration-contract.md`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
-- [ ] **Step 1: Write a failing event-translation test**
+- [x] **Step 1: Verify the SDK type and write failing translation tests**
 
-Given a Gemini server message with `server_content.interrupted == true`, expect:
+In google-genai 2.8.0, `LiveServerContent.interrupted` is
+`Optional[bool]` with a default of `None`.
+
+Given a Gemini server message with `server_content.interrupted == true`,
+expect exactly one:
 
 ```json
 {"type":"interrupted","data":""}
 ```
 
-- [ ] **Step 2: Implement the backend translation**
+Also cover `false` and verify interruption precedes usage, text, audio, and
+turn-complete events translated from the same service message.
 
-The backend only forwards the event. The separate frontend is responsible for immediately stopping and clearing queued audio playback.
+- [x] **Step 2: Implement the backend translation**
 
-- [ ] **Step 3: Verify and commit**
+The backend only forwards the event, before other outputs from the same
+service message. The separate frontend is responsible for immediately
+stopping and clearing queued model audio; microphone capture may continue.
+
+- [x] **Step 3: Verify and commit**
 
 ```bash
+(cd backend && uv run pytest -q tests/test_gemini_service.py -k interruption)
 (cd backend && uv run pytest -q)
 (cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/gemini_service.py \
-  backend/tests/test_gemini_service.py docs/frontend-integration-contract.md
-git commit -m "feat: expose Gemini interruption events"
+  backend/tests/test_gemini_service.py docs/frontend-integration-contract.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
+git commit -m "feat: 转发 Gemini 用户打断事件"
 ```
 
 ---

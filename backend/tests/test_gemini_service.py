@@ -157,3 +157,76 @@ def test_maps_live_server_usage_metadata_with_sdk_type():
     assert asyncio.run(collect()) == [
         GeminiResponse(usage_metadata=metadata)
     ]
+
+
+def test_interruption_precedes_same_message_outputs_and_is_emitted_once():
+    metadata = types.UsageMetadata(total_token_count=1)
+    message = types.LiveServerMessage(
+        server_content=types.LiveServerContent(
+            interrupted=True,
+            output_transcription=types.Transcription(text="取消前文本"),
+            model_turn=types.Content(
+                parts=[
+                    types.Part(
+                        inline_data=types.Blob(
+                            data=b"pcm",
+                            mime_type="audio/pcm",
+                        )
+                    )
+                ]
+            ),
+            turn_complete=True,
+        ),
+        usage_metadata=metadata,
+    )
+
+    class ReceivingSession:
+        async def receive(self):
+            yield message
+
+    async def collect():
+        return [
+            event
+            async for event in GeminiSession(ReceivingSession()).receive()
+        ]
+
+    assert asyncio.run(collect()) == [
+        GeminiResponse(payload={"type": "interrupted", "data": ""}),
+        GeminiResponse(usage_metadata=metadata),
+        GeminiResponse(
+            payload={"type": "text", "data": "取消前文本"},
+            model_output=True,
+        ),
+        GeminiResponse(
+            payload={"type": "audio", "data": "cGNt"},
+            model_output=True,
+        ),
+        GeminiResponse(
+            payload={"type": "turn_complete", "data": ""}
+        ),
+    ]
+
+
+def test_false_interruption_does_not_emit_an_event():
+    message = types.LiveServerMessage(
+        server_content=types.LiveServerContent(
+            interrupted=False,
+            turn_complete=True,
+        )
+    )
+
+    class ReceivingSession:
+        async def receive(self):
+            yield message
+
+    async def collect():
+        return [
+            event
+            async for event in GeminiSession(ReceivingSession()).receive()
+        ]
+
+    assert asyncio.run(collect()) == [
+        GeminiResponse(
+            payload={"type": "turn_complete", "data": ""}
+        )
+    ]
