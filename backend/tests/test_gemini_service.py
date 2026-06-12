@@ -71,6 +71,23 @@ def test_build_live_config_uses_cost_safe_live_defaults():
         == "Kore"
     )
     assert config.system_instruction == SYSTEM_PROMPT
+    assert config.session_resumption == types.SessionResumptionConfig(
+        transparent=True
+    )
+
+
+def test_build_live_config_includes_resume_handle():
+    app_settings = Settings(
+        gemini_api_key="test-key",
+        _env_file=None,
+    )
+
+    config = build_live_config(app_settings, resume_handle="opaque-handle")
+
+    assert config.session_resumption == types.SessionResumptionConfig(
+        handle="opaque-handle",
+        transparent=True,
+    )
 
 
 def test_connect_uses_live_config_builder(monkeypatch):
@@ -97,7 +114,7 @@ def test_connect_uses_live_config_builder(monkeypatch):
     monkeypatch.setattr(
         gemini_service,
         "build_live_config",
-        lambda app_settings: expected_config,
+        lambda app_settings, resume_handle=None: expected_config,
     )
     service = GeminiLiveService(
         Settings(gemini_api_key="test-key", _env_file=None)
@@ -228,5 +245,62 @@ def test_false_interruption_does_not_emit_an_event():
     assert asyncio.run(collect()) == [
         GeminiResponse(
             payload={"type": "turn_complete", "data": ""}
+        )
+    ]
+
+
+def test_translates_resumption_update_without_exposing_handle():
+    message = types.LiveServerMessage(
+        session_resumption_update=types.LiveServerSessionResumptionUpdate(
+            new_handle="opaque-handle",
+            resumable=True,
+            last_consumed_client_message_index=7,
+        )
+    )
+
+    class ReceivingSession:
+        async def receive(self):
+            yield message
+
+    async def collect():
+        return [
+            event
+            async for event in GeminiSession(ReceivingSession()).receive()
+        ]
+
+    assert asyncio.run(collect()) == [
+        GeminiResponse(
+            payload={
+                "type": "session_resumption",
+                "data": {"resumable": True},
+            },
+            resumption_handle="opaque-handle",
+            resumable=True,
+        )
+    ]
+
+
+def test_translates_go_away_deadline_to_milliseconds():
+    message = types.LiveServerMessage(
+        go_away=types.LiveServerGoAway(time_left="5.250s")
+    )
+
+    class ReceivingSession:
+        async def receive(self):
+            yield message
+
+    async def collect():
+        return [
+            event
+            async for event in GeminiSession(ReceivingSession()).receive()
+        ]
+
+    assert asyncio.run(collect()) == [
+        GeminiResponse(
+            payload={
+                "type": "go_away",
+                "data": {"time_left_ms": 5250},
+            },
+            go_away=True,
         )
     ]

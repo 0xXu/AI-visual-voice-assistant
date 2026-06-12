@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
+from dataclasses import dataclass
 from enum import Enum
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -9,7 +10,11 @@ from starlette.websockets import WebSocketState
 
 from app.api.messages import ClientMessageError, parse_client_message
 from app.core.config import ConfigurationError, settings
-from app.services.gemini_service import GeminiLiveService, GeminiSession
+from app.services.gemini_service import (
+    GeminiLiveService,
+    GeminiResponse,
+    GeminiSession,
+)
 from app.services.input_scheduler import InputScheduler, VideoSubmission
 from app.services.session_runtime import (
     SessionIdleTimeout,
@@ -29,6 +34,21 @@ class SessionEndReason(Enum):
     STOPPED = "stopped"
     SESSION_ENDED = "session_ended"
     BUDGET_EXCEEDED = "budget_exceeded"
+    GO_AWAY = "go_away"
+
+
+@dataclass(slots=True)
+class SessionResumptionState:
+    latest_handle: str | None = None
+
+    def apply(self, response: GeminiResponse) -> None:
+        if response.resumable is False:
+            self.latest_handle = None
+        elif (
+            response.resumable is True
+            and response.resumption_handle is not None
+        ):
+            self.latest_handle = response.resumption_handle
 
 
 def _observe_task_result(task: asyncio.Task[object]) -> None:
@@ -77,8 +97,11 @@ async def _forward_gemini_responses(
     websocket: WebSocket,
     session: GeminiSession,
     usage: SessionUsage,
+    resumption: SessionResumptionState | None = None,
 ) -> SessionEndReason:
     async for response in session.receive():
+        if resumption is not None:
+            resumption.apply(response)
         if response.usage_metadata is not None:
             usage.record_gemini_usage(response.usage_metadata)
             if usage.budget_exceeded:
@@ -92,6 +115,8 @@ async def _forward_gemini_responses(
             if response.model_output:
                 usage.record_response()
             await websocket.send_json(response.payload)
+        if response.go_away:
+            return SessionEndReason.GO_AWAY
     return SessionEndReason.SESSION_ENDED
 
 
@@ -259,6 +284,7 @@ async def _run_session(
     session: GeminiSession,
     runtime: SessionRuntime | None = None,
     usage: SessionUsage | None = None,
+    resumption: SessionResumptionState | None = None,
 ) -> SessionEndReason:
     if runtime is None:
         runtime = _create_runtime()
@@ -278,7 +304,12 @@ async def _run_session(
         name="接收客户端消息",
     )
     response_task = asyncio.create_task(
-        _forward_gemini_responses(websocket, session, usage),
+        _forward_gemini_responses(
+            websocket,
+            session,
+            usage,
+            resumption,
+        ),
         name="转发模型响应",
     )
     tasks = {
@@ -377,32 +408,76 @@ async def _serve_websocket(
             try:
                 service = service_factory()
                 terminal_status = "stopped"
-                usage: SessionUsage | None = None
-                async with service.connect() as session:
-                    usage = usage_factory()
-                    await websocket.send_json({
-                        "type": "status",
-                        "data": "connected",
-                    })
-                    logger.info(
-                        "Gemini Live 会话已建立，模型：%s",
-                        service.model,
-                    )
+                usage = usage_factory()
+                runtime = runtime_factory()
+                resumption = SessionResumptionState()
+                resume_handle: str | None = None
+                resume_attempted = False
+                clean_fallback_attempted = False
+                connected_sent = False
+
+                while True:
+                    attempting_resume = resume_handle is not None
+                    connection_established = False
                     try:
-                        reason = await _run_session(
-                            websocket,
-                            session,
-                            runtime_factory(),
-                            usage,
-                        )
+                        async with service.connect(
+                            resume_handle=resume_handle
+                        ) as session:
+                            connection_established = True
+                            if not connected_sent:
+                                await websocket.send_json({
+                                    "type": "status",
+                                    "data": "connected",
+                                })
+                                connected_sent = True
+                            logger.info(
+                                "Gemini Live 会话已建立，模型：%s",
+                                service.model,
+                            )
+                            reason = await _run_session(
+                                websocket,
+                                session,
+                                runtime,
+                                usage,
+                                resumption,
+                            )
                     except SessionIdleTimeout:
                         terminal_status = "idle_timeout"
+                        break
                     except SessionLifetimeExceeded:
                         terminal_status = "max_duration"
+                        break
+                    except WebSocketDisconnect:
+                        raise
+                    except Exception:
+                        if (
+                            attempting_resume
+                            and not connection_established
+                            and not clean_fallback_attempted
+                        ):
+                            clean_fallback_attempted = True
+                            resume_handle = None
+                            resumption.latest_handle = None
+                            logger.warning(
+                                "Gemini 会话恢复失败，回退到干净新会话",
+                                exc_info=True,
+                            )
+                            continue
+                        raise
                     else:
                         if reason is SessionEndReason.BUDGET_EXCEEDED:
                             terminal_status = "budget_exceeded"
-                assert usage is not None
+                            break
+                        if (
+                            reason is SessionEndReason.GO_AWAY
+                            and not resume_attempted
+                            and resumption.latest_handle is not None
+                        ):
+                            resume_attempted = True
+                            resume_handle = resumption.latest_handle
+                            continue
+                        break
+
                 await websocket.send_json({
                     "type": "status",
                     "data": terminal_status,
