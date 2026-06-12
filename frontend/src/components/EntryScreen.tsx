@@ -12,9 +12,9 @@ export function EntryScreen({ onStart }: EntryScreenProps) {
       <div className="entry-grid" aria-hidden="true" />
 
       <header className="entry-header">
-        <a className="brand-mark" href="/" aria-label="AI 视觉对话助手首页">
+        <a className="brand-mark" href="/" aria-label="EchoSight 首页">
           <span className="brand-mark__signal" aria-hidden="true" />
-          <span>视觉对话</span>
+          <span>EchoSight</span>
         </a>
         <span className="entry-header__status">
           <span aria-hidden="true" />
@@ -27,7 +27,7 @@ export function EntryScreen({ onStart }: EntryScreenProps) {
           <span className="eyebrow__icon" aria-hidden="true">
             <Camera size={14} strokeWidth={2} />
           </span>
-          实时视觉对话
+          EchoSight 实时视觉对话
         </p>
 
         <h1 id="entry-title">
