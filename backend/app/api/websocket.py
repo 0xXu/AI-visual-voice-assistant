@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from enum import Enum
 
@@ -40,6 +40,15 @@ async def _forward_gemini_responses(
 ) -> None:
     async for response in session.receive():
         await websocket.send_json(response)
+
+
+async def _record_activity_after(
+    submission: Awaitable[None],
+    runtime: SessionRuntime | None,
+) -> None:
+    await submission
+    if runtime is not None:
+        runtime.record_activity()
 
 
 async def _forward_client_messages(
@@ -85,11 +94,12 @@ async def _forward_client_messages(
                     )
                     continue
                 pending_audio = asyncio.create_task(
-                    scheduler.submit_audio(message.data),
+                    _record_activity_after(
+                        scheduler.submit_audio(message.data),
+                        runtime,
+                    ),
                     name="提交音频输入",
                 )
-                if runtime is not None:
-                    runtime.record_activity()
                 await asyncio.sleep(0)
             elif message.type == "video_frame":
                 assert isinstance(message.data, bytes)
@@ -113,11 +123,12 @@ async def _forward_client_messages(
                     )
                     continue
                 pending_text = asyncio.create_task(
-                    scheduler.submit_text(message.data),
+                    _record_activity_after(
+                        scheduler.submit_text(message.data),
+                        runtime,
+                    ),
                     name="提交文本输入",
                 )
-                if runtime is not None:
-                    runtime.record_activity()
                 await asyncio.sleep(0)
     finally:
         pending = [
