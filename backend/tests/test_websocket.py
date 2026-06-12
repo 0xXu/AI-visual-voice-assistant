@@ -77,7 +77,7 @@ class FakeService:
         self.released = False
 
     @asynccontextmanager
-    async def connect(self):
+    async def connect(self, resume_handle=None):
         try:
             yield self.session
         finally:
@@ -719,5 +719,218 @@ def test_cleanup_has_second_hard_timeout_and_observes_late_exception(
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         assert "late cancellation failure" in caplog.text
+
+    asyncio.run(scenario())
+
+
+def test_go_away_reconnects_once_with_latest_handle():
+    async def scenario():
+        resumed = asyncio.Event()
+
+        class ResumeAwareWebSocket(FakeWebSocket):
+            stop_sent = False
+
+            async def receive_text(self):
+                try:
+                    return next(self.messages)
+                except StopIteration:
+                    if self.stop_sent:
+                        raise WebSocketDisconnect()
+                    await resumed.wait()
+                    self.stop_sent = True
+                    return json.dumps({
+                        "type": "stop_session",
+                        "data": "",
+                    })
+
+        class FirstSession(RecordingSession):
+            async def receive(self):
+                yield GeminiResponse(
+                    payload={
+                        "type": "session_resumption",
+                        "data": {"resumable": True},
+                    },
+                    resumption_handle="latest-handle",
+                    resumable=True,
+                )
+                yield GeminiResponse(
+                    payload={
+                        "type": "go_away",
+                        "data": {"time_left_ms": 5000},
+                    },
+                    go_away=True,
+                )
+
+        class ReconnectingService:
+            model = "fake-live-model"
+
+            def __init__(self):
+                self.handles = []
+
+            @asynccontextmanager
+            async def connect(self, resume_handle=None):
+                self.handles.append(resume_handle)
+                if resume_handle is None:
+                    yield FirstSession()
+                else:
+                    resumed.set()
+                    yield RecordingSession()
+
+        service = ReconnectingService()
+        websocket = ResumeAwareWebSocket([
+            json.dumps({"type": "start_session", "data": ""}),
+        ])
+
+        await _serve_websocket(
+            websocket,
+            service_factory=lambda: service,
+        )
+
+        assert service.handles == [None, "latest-handle"]
+        assert {
+            "type": "session_resumption",
+            "data": {"resumable": True},
+        } in websocket.sent
+        assert {
+            "type": "go_away",
+            "data": {"time_left_ms": 5000},
+        } in websocket.sent
+        assert sum(
+            message["type"] == "usage"
+            for message in websocket.sent
+        ) == 1
+
+    asyncio.run(scenario())
+
+
+def test_failed_resume_falls_back_once_to_clean_session():
+    async def scenario():
+        fallback_connected = asyncio.Event()
+
+        class FallbackAwareWebSocket(FakeWebSocket):
+            stop_sent = False
+
+            async def receive_text(self):
+                try:
+                    return next(self.messages)
+                except StopIteration:
+                    if self.stop_sent:
+                        raise WebSocketDisconnect()
+                    await fallback_connected.wait()
+                    self.stop_sent = True
+                    return json.dumps({
+                        "type": "stop_session",
+                        "data": "",
+                    })
+
+        class FirstSession(RecordingSession):
+            async def receive(self):
+                yield GeminiResponse(
+                    payload={
+                        "type": "session_resumption",
+                        "data": {"resumable": True},
+                    },
+                    resumption_handle="rejected-handle",
+                    resumable=True,
+                )
+                yield GeminiResponse(
+                    payload={
+                        "type": "go_away",
+                        "data": {"time_left_ms": 1000},
+                    },
+                    go_away=True,
+                )
+
+        class FallbackService:
+            model = "fake-live-model"
+
+            def __init__(self):
+                self.handles = []
+
+            @asynccontextmanager
+            async def connect(self, resume_handle=None):
+                self.handles.append(resume_handle)
+                if len(self.handles) == 1:
+                    yield FirstSession()
+                elif resume_handle is not None:
+                    raise RuntimeError("resume rejected")
+                else:
+                    fallback_connected.set()
+                    yield RecordingSession()
+
+        service = FallbackService()
+        websocket = FallbackAwareWebSocket([
+            json.dumps({"type": "start_session", "data": ""}),
+        ])
+
+        await _serve_websocket(
+            websocket,
+            service_factory=lambda: service,
+        )
+
+        assert service.handles == [
+            None,
+            "rejected-handle",
+            None,
+        ]
+        assert sum(
+            message["type"] == "usage"
+            for message in websocket.sent
+        ) == 1
+
+    asyncio.run(scenario())
+
+
+def test_user_stop_does_not_trigger_resumption():
+    async def scenario():
+        stop_received = asyncio.Event()
+
+        class StopAndGoAwayWebSocket(FakeWebSocket):
+            async def receive_text(self):
+                message = await super().receive_text()
+                if json.loads(message)["type"] == "stop_session":
+                    stop_received.set()
+                return message
+
+        class GoAwayAfterStopSession(RecordingSession):
+            async def receive(self):
+                await stop_received.wait()
+                yield GeminiResponse(
+                    payload={
+                        "type": "go_away",
+                        "data": {"time_left_ms": 1000},
+                    },
+                    resumption_handle="unused-handle",
+                    resumable=True,
+                    go_away=True,
+                )
+
+        class RecordingService:
+            model = "fake-live-model"
+
+            def __init__(self):
+                self.handles = []
+
+            @asynccontextmanager
+            async def connect(self, resume_handle=None):
+                self.handles.append(resume_handle)
+                yield GoAwayAfterStopSession()
+
+        service = RecordingService()
+        websocket = StopAndGoAwayWebSocket([
+            json.dumps({"type": "start_session", "data": ""}),
+            json.dumps({"type": "stop_session", "data": ""}),
+        ])
+
+        await _serve_websocket(
+            websocket,
+            service_factory=lambda: service,
+        )
+
+        assert service.handles == [None]
+        assert sum(
+            message["type"] == "usage"
+            for message in websocket.sent
+        ) == 1
 
     asyncio.run(scenario())

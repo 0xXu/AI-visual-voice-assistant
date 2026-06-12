@@ -39,7 +39,7 @@ Protocol stages:
 | 3 | Released: explicit session lifecycle |
 | 5 | Released: usage and budget events |
 | 6 | Released: interruption event |
-| 7 | Planned: GoAway and resumption events |
+| 7 | Released: GoAway and transparent session resumption |
 
 ## Endpoint
 
@@ -308,6 +308,34 @@ turn-complete event translated from the same message.
 On receipt, immediately stop current model playback and clear queued model
 audio. Microphone capture may continue.
 
+### Stage 7 GoAway And Session Resumption
+
+```json
+{"type":"session_resumption","data":{"resumable":true}}
+```
+
+`data` contains only the current `resumable` flag. The backend keeps the
+opaque Gemini handle in memory for the current browser WebSocket and never
+sends it to the frontend.
+
+```json
+{"type":"go_away","data":{"time_left_ms":5000}}
+```
+
+`time_left_ms` is Gemini's remaining connection lifetime converted from the
+google-genai 2.8.0 duration string to milliseconds.
+
+After GoAway, the browser WebSocket stays open. The backend closes the current
+Gemini connection and attempts at most one automatic reconnection using the
+latest valid handle. If that resumed connection cannot be established, the
+backend attempts one clean Gemini connection without a handle. It does not
+retry either path indefinitely.
+
+Automatic reconnection preserves the current logical session's runtime and
+usage counters. The backend still emits exactly one final terminal `status`
+and one final `usage` event. User stop, token budget exhaustion, idle timeout,
+and maximum duration are terminal and never trigger automatic resumption.
+
 ### Server Turn Complete
 
 ```json
@@ -352,28 +380,12 @@ GitHub merge state.
 
 ---
 
-## Planned Protocol Evolution
-
-### Task 7: GoAway And Resumption
-
-Available only when the deployment reports protocol stage 7 or later.
-
-```json
-{"type":"go_away","data":{"time_left_ms":5000}}
-```
-
-```json
-{"type":"session_resumption","data":{"resumable":true}}
-```
-
-The backend owns the opaque Gemini resumption handle and cloud reconnection.
-The frontend must not persist or replay the handle.
-
 ## Frontend Compatibility Rules
 
 - Implement the released protocol as the default behavior.
-- Feature-gate planned messages using the protocol stage supplied by the
-  deployment owner. Do not infer deployed capability from GitHub merge state.
+- Feature-gate stage-specific messages using the protocol stage supplied by
+  the deployment owner. Do not infer deployed capability from GitHub merge
+  state.
 - Never send media before `connected`.
 - Reply to backend `ping` with `pong`.
 - Treat unknown message types and status values defensively without crashing.

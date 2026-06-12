@@ -513,7 +513,7 @@ git commit -m "feat: 转发 Gemini 用户打断事件"
 
 ### Task 7: Add Session Resumption And GoAway Events
 
-**PR title:** `feat: support Gemini session resumption signals`
+**PR title:** `feat: 支持 Gemini 会话恢复与 GoAway`
 
 **Files:**
 - Modify: `backend/app/services/gemini_service.py`
@@ -521,35 +521,42 @@ git commit -m "feat: 转发 Gemini 用户打断事件"
 - Modify: `backend/tests/test_gemini_service.py`
 - Modify: `backend/tests/test_websocket.py`
 - Modify: `docs/frontend-integration-contract.md`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
-- [ ] **Step 1: Write failing translation and lifecycle tests**
+- [x] **Step 1: Write failing translation and lifecycle tests**
 
 Cover:
 
 ```python
-def test_translates_resumption_handle(): ...
-def test_translates_go_away_deadline(): ...
-async def test_next_cloud_session_reuses_latest_handle(): ...
-async def test_invalid_handle_falls_back_to_clean_session(): ...
+def test_build_live_config_includes_resume_handle(): ...
+def test_translates_resumption_update_without_exposing_handle(): ...
+def test_translates_go_away_deadline_to_milliseconds(): ...
+def test_go_away_reconnects_once_with_latest_handle(): ...
+def test_failed_resume_falls_back_once_to_clean_session(): ...
+def test_user_stop_does_not_trigger_resumption(): ...
 ```
 
-- [ ] **Step 2: Implement backend session management**
+- [x] **Step 2: Implement backend session management**
 
 - Enable transparent session resumption in the Live configuration.
 - Store only the latest valid resumption handle for the current browser WebSocket.
-- Emit `session_resumption` and `go_away` events to the client.
+- Emit `session_resumption` with only `resumable`; never expose the opaque handle.
+- Emit `go_away` with the remaining connection lifetime in milliseconds.
 - Attempt one resumed connection after GoAway.
 - Fall back to a clean session when resumption is rejected.
+- Preserve logical-session runtime and usage across cloud reconnections.
+- Do not resume after user stop, budget exhaustion, idle timeout, or maximum duration.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 (cd backend && uv run pytest -q)
 (cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/gemini_service.py backend/app/api/websocket.py \
   backend/tests/test_gemini_service.py backend/tests/test_websocket.py \
-  docs/frontend-integration-contract.md
-git commit -m "feat: support Gemini session resumption"
+  docs/frontend-integration-contract.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
+git commit -m "feat: 支持 Gemini 会话恢复与 GoAway"
 ```
 
 ---
