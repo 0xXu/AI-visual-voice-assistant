@@ -43,7 +43,7 @@ def parse_client_message(
 ) -> ClientMessage:
     try:
         payload = json.loads(raw_message)
-    except json.JSONDecodeError as exc:
+    except (ValueError, RecursionError) as exc:
         raise ClientMessageError("消息不是有效的 JSON") from exc
 
     if not isinstance(payload, dict):
@@ -119,7 +119,7 @@ def _parse_video_frame(
 ) -> ClientMessage:
     decoded = _parse_base64(payload.get("data"), settings.max_video_bytes)
     if not decoded.startswith(b"\xff\xd8") or not decoded.endswith(b"\xff\xd9"):
-        raise ClientMessageError("视频帧必须是有效的 JPEG 数据")
+        raise ClientMessageError("视频帧必须包含 JPEG SOI/EOI 起止标记")
 
     timestamp_ms = _parse_integer(payload.get("timestamp"), "timestamp")
     sequence = _parse_integer(payload.get("sequence"), "sequence")

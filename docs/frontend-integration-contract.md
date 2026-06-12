@@ -129,8 +129,10 @@ Recommended frontend chunk duration is 20–40 ms.
 
 Requirements:
 
-- `data` must be strict Base64 containing a complete JPEG image with JPEG
-  start and end markers.
+- `data` must be strict Base64 whose decoded bytes start with the JPEG SOI
+  marker (`FF D8`) and end with the JPEG EOI marker (`FF D9`).
+- This marker-envelope check does not verify that the bytes form a complete or
+  decodable JPEG image.
 - Maximum decoded size is 524,288 bytes by default.
 - `timestamp` must be an integer Unix epoch timestamp in milliseconds.
 - `sequence` must be an integer.

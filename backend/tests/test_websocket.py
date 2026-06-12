@@ -93,3 +93,19 @@ def test_returns_chinese_error_and_continues_after_invalid_message():
         "data": "媒体内容不是有效的 Base64 数据",
     }]
     assert session.text == ["继续"]
+
+
+def test_continues_after_json_parser_value_error():
+    websocket = FakeWebSocket([
+        '{"type":' + "9" * 5_000 + "}",
+        json.dumps({"type": "text", "data": "继续"}),
+    ])
+    session = FakeGeminiSession()
+
+    run_forwarder(websocket, session)
+
+    assert websocket.sent == [{
+        "type": "error",
+        "data": "消息不是有效的 JSON",
+    }]
+    assert session.text == ["继续"]

@@ -23,6 +23,27 @@ def encode(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
+@pytest.mark.parametrize(
+    "raw_message",
+    [
+        pytest.param(
+            '{"type":' + "9" * 5_000 + "}",
+            id="integer-exceeds-conversion-limit",
+        ),
+        pytest.param(
+            '{"type":' + "[" * 2_000 + "0" + "]" * 2_000 + "}",
+            id="excessive-nesting",
+        ),
+    ],
+)
+def test_wraps_json_parser_failures_as_chinese_client_errors(
+    settings,
+    raw_message,
+):
+    with pytest.raises(ClientMessageError, match="消息不是有效的 JSON"):
+        parse_client_message(raw_message, settings)
+
+
 def test_parses_audio_bytes(settings):
     message = parse_client_message(
         json.dumps({"type": "audio", "data": encode(b"\x01\x02")}),
@@ -195,13 +216,21 @@ def test_rejects_jpeg_video_one_byte_over_max(settings):
         )
 
 
-def test_rejects_non_jpeg_video(settings):
-    with pytest.raises(ClientMessageError, match="JPEG"):
+@pytest.mark.parametrize(
+    "frame",
+    [
+        pytest.param(b"frame\xff\xd9", id="missing-soi"),
+        pytest.param(b"\xff\xd8frame", id="missing-eoi"),
+        pytest.param(b"not-a-jpeg", id="missing-both"),
+    ],
+)
+def test_rejects_video_without_jpeg_soi_eoi_markers(settings, frame):
+    with pytest.raises(ClientMessageError, match="JPEG SOI/EOI"):
         parse_client_message(
             json.dumps(
                 {
                     "type": "video_frame",
-                    "data": encode(b"not-a-jpeg"),
+                    "data": encode(frame),
                     "timestamp": 1_000,
                     "sequence": 1,
                 }
