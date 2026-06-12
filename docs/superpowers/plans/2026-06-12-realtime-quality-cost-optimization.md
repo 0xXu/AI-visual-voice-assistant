@@ -520,7 +520,7 @@ Document Google AI Studio `GEMINI_API_KEY`, all queue/media/session/budget defau
 - [ ] **Step 2: Verify secrets and Chinese runtime output**
 
 ```bash
-rg -n 'GEMINI_API_KEY=[A-Za-z0-9_-]{20,}|AQ\.[A-Za-z0-9_-]{20,}' . \
+rg -n 'AQ\.[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}' . \
   -g '!backend/.env' -g '!.git/**' -g '!docs/superpowers/plans/**'
 rg -n '\\bprint\\s*\\(' backend/app
 ```
