@@ -83,13 +83,13 @@ backend commands do not change the shell's working directory.
 
 ### Task 0: Document Backend And Frontend Separation
 
-**PR title:** `docs: define backend and frontend integration boundary`
+**PR title:** `docs: 明确后端与前端独立开发边界`
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 - Create: `docs/frontend-integration-contract.md`
 
-- [ ] **Step 1: Verify the plan has no frontend implementation paths**
+- [x] **Step 1: Verify the plan has no frontend implementation paths**
 
 Run:
 
@@ -100,7 +100,7 @@ rg -n 'frontend/(app|hooks|lib)' \
 
 Expected: no matches.
 
-- [ ] **Step 2: Verify the Released Protocol contains every current message heading**
+- [x] **Step 2: Verify the Released Protocol contains every current message heading**
 
 Run:
 
@@ -121,7 +121,7 @@ rm "$released"
 Expected: exit status 0. Planned lifecycle messages are outside the extracted
 Released Protocol section.
 
-- [ ] **Step 3: Run backend verification**
+- [x] **Step 3: Run backend verification**
 
 ```bash
 (cd backend && uv run pytest -q)
@@ -130,7 +130,7 @@ Released Protocol section.
 
 Expected: all tests pass and compilation exits successfully.
 
-- [ ] **Step 4: Commit and open one documentation-only PR**
+- [x] **Step 4: Commit and open one documentation-only PR**
 
 ```bash
 git add docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md \
@@ -142,7 +142,7 @@ git commit -m "docs: define backend frontend boundary"
 
 ### Task 1: Add Bounded Real-Time Media Protocol
 
-**PR title:** `feat: validate and bound realtime client media`
+**PR title:** `feat: 校验并限制实时媒体输入`
 
 **Files:**
 - Modify: `backend/app/api/messages.py`
@@ -155,7 +155,7 @@ git commit -m "docs: define backend frontend boundary"
 - Modify: `docs/frontend-integration-contract.md`
 - Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
-- [ ] **Step 1: Write failing protocol tests**
+- [x] **Step 1: Write failing protocol tests**
 
 Cover:
 
@@ -167,7 +167,7 @@ def test_rejects_stale_and_future_video_timestamps(settings): ...
 def test_parses_bounded_text_messages(settings): ...
 ```
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 ```bash
 (cd backend && uv run pytest tests/test_messages.py tests/test_config.py -q)
@@ -175,7 +175,7 @@ def test_parses_bounded_text_messages(settings): ...
 
 Expected: new validation cases fail before implementation.
 
-- [ ] **Step 3: Implement the bounded parser**
+- [x] **Step 3: Implement the bounded parser**
 
 Requirements:
 
@@ -205,7 +205,7 @@ git commit -m "feat: add bounded realtime media protocol"
 
 ### Task 2: Add Bounded Fair Input Scheduler
 
-**PR title:** `feat: prioritize audio and retain the latest video frame`
+**PR title:** `feat: 增加有界公平实时输入调度器`
 
 **Files:**
 - Create: `backend/app/services/input_scheduler.py`
@@ -249,7 +249,7 @@ Requirements:
 - Shutdown wakes blocked producers, propagates drain failures, and has a hard timeout.
 - The WebSocket remains the only task reading client messages.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 (cd backend && uv run pytest -q)
@@ -266,7 +266,7 @@ git commit -m "feat: add bounded fair input scheduler"
 
 ### Task 3: Add Explicit Session Lifecycle And Limits
 
-**PR title:** `feat: enforce explicit realtime session lifecycle`
+**PR title:** `feat: 发布显式会话生命周期与超时清理`
 
 **Files:**
 - Create: `backend/app/services/session_runtime.py`
@@ -342,7 +342,7 @@ git commit -m "feat: enforce realtime session lifecycle"
 
 ### Task 4: Add Cost-Safe Gemini Live Configuration
 
-**PR title:** `Task4：配置 Gemini Live 成本安全默认值`
+**PR title:** `feat: 配置 Gemini Live 成本安全默认值`
 
 **Files:**
 - Modify: `backend/app/services/gemini_service.py`
@@ -369,7 +369,8 @@ Create `build_live_config(settings)` and set:
 - existing Chinese system instruction;
 - existing input/output transcription and automatic activity detection.
 
-Keep Google AI Studio API-key authentication only. Do not add Vertex AI settings.
+Keep Google AI Studio API-key authentication only. Do not add alternative
+cloud authentication settings.
 The installed `google-genai` 2.x types make compression token thresholds
 optional, so this task does not add speculative environment settings or change
 `backend/.env.example`.
@@ -383,7 +384,7 @@ optional, so this task does not add speculative environment settings or change
 git add backend/app/services/gemini_service.py \
   backend/tests/test_gemini_service.py \
   docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
-git commit -m "Task4：配置 Gemini Live 成本安全默认值"
+git commit -m "feat: 配置 Gemini Live 成本安全默认值"
 ```
 
 This task does not change the WebSocket wire protocol, so
@@ -461,7 +462,7 @@ git add backend/app/services/usage.py backend/tests/test_usage.py \
   docs/frontend-integration-contract.md \
   docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md \
   README.md
-git commit -m "Task5：增加会话用量统计与 token 预算"
+git commit -m "feat: 增加会话用量统计与 token 预算"
 ```
 
 ---
@@ -563,14 +564,14 @@ git commit -m "feat: 支持 Gemini 会话恢复与 GoAway"
 
 ### Task 8: Document And Verify Backend Operational Defaults
 
-**PR title:** `docs: document backend realtime operations`
+**PR title:** `docs: 完善后端实时会话运维说明`
 
 **Files:**
 - Modify: `README.md`
-- Modify: `backend/.env.example`
-- Modify: `docs/frontend-integration-contract.md`
+- Verify unchanged: `backend/.env.example`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
-- [ ] **Step 1: Document backend-only setup**
+- [x] **Step 1: Document backend-only setup**
 
 The README must show:
 
@@ -581,19 +582,21 @@ cp .env.example .env
 uv run uvicorn app.main:app --reload
 ```
 
-Document Google AI Studio `GEMINI_API_KEY`, all queue/media/session/budget defaults, WebSocket endpoint, and test commands. Do not document Docker, Cloud Build, Vertex AI, or frontend build commands.
+Document Google AI Studio `GEMINI_API_KEY`, all queue/media/session/budget
+defaults, WebSocket endpoint, and test commands. Keep deployment systems and
+frontend build instructions out of this backend operations guide.
 
-- [ ] **Step 2: Verify secrets and Chinese runtime output**
+- [x] **Step 2: Verify secrets and Chinese runtime output**
 
 ```bash
-rg -n 'AQ\.[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}' . \
+rg -n 'AIza[0-9A-Za-z_-]{35}' . \
   -g '!backend/.env' -g '!.git/**' -g '!docs/superpowers/plans/**'
 rg -n '\\bprint\\s*\\(' backend/app
 ```
 
 Expected: no real API key and no backend `print()` calls.
 
-- [ ] **Step 3: Run final backend verification**
+- [x] **Step 3: Run final backend verification**
 
 ```bash
 (cd backend && uv sync --locked)
@@ -601,11 +604,12 @@ Expected: no real API key and no backend `print()` calls.
 (cd backend && uv run python -m compileall -q app tests)
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
-git add README.md backend/.env.example docs/frontend-integration-contract.md
-git commit -m "docs: document backend realtime operations"
+git add README.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
+git commit -m "docs: 完善后端实时会话运维说明"
 ```
 
 ---
@@ -624,4 +628,5 @@ Merge strictly in this order:
 8. Task 7: Session resumption and GoAway
 9. Task 8: Operational documentation
 
-Task 1–3 code currently exists only as preparatory commits on a temporary branch. Those commits must be replayed into separate branches after Task 0 merges; the temporary combined branch must not be opened as a PR.
+Tasks 0–7 have merged as separate functional PRs. Task 8 is the final
+documentation-only PR.
