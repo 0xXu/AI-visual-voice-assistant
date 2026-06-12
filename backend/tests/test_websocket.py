@@ -1,12 +1,12 @@
 import asyncio
 import base64
 import json
-import time
 
 import pytest
 from fastapi import WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
+from app.api import messages
 from app.api.websocket import _forward_client_messages
 
 
@@ -48,7 +48,13 @@ def run_forwarder(websocket, session):
         asyncio.run(_forward_client_messages(websocket, session))
 
 
-def test_forwards_ping_and_multimodal_messages():
+def test_forwards_ping_and_multimodal_messages(monkeypatch):
+    fixed_now_ms = 10_000
+    monkeypatch.setattr(
+        messages.time,
+        "time_ns",
+        lambda: fixed_now_ms * 1_000_000,
+    )
     encoded = base64.b64encode(b"data").decode("ascii")
     jpeg = b"\xff\xd8data\xff\xd9"
     encoded_jpeg = base64.b64encode(jpeg).decode("ascii")
@@ -58,7 +64,7 @@ def test_forwards_ping_and_multimodal_messages():
         json.dumps({
             "type": "video_frame",
             "data": encoded_jpeg,
-            "timestamp": time.time_ns() // 1_000_000,
+            "timestamp": fixed_now_ms,
             "sequence": 1,
         }),
         json.dumps({"type": "text", "data": "  请描述画面  "}),

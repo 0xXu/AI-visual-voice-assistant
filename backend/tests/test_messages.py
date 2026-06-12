@@ -1,9 +1,9 @@
 import base64
 import json
-import time
 
 import pytest
 
+from app.api import messages
 from app.api.messages import ClientMessageError, parse_client_message
 from app.core.config import Settings
 
@@ -71,6 +71,19 @@ def test_rejects_oversized_binary_payload(settings):
     with pytest.raises(ClientMessageError, match="过大"):
         parse_client_message(
             json.dumps({"type": "audio", "data": encode(b"1234567890")}),
+            settings,
+        )
+
+
+def test_rejects_oversized_base64_before_decoding(settings, monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        pytest.fail("oversized Base64 payload must not be decoded")
+
+    monkeypatch.setattr(messages.base64, "b64decode", fail_if_called)
+
+    with pytest.raises(ClientMessageError, match="过大"):
+        parse_client_message(
+            json.dumps({"type": "audio", "data": "A" * 16}),
             settings,
         )
 
@@ -143,8 +156,41 @@ def test_rejects_stale_video_frame(settings):
         )
 
 
+def test_rejects_video_frame_beyond_future_clock_skew(settings):
+    with pytest.raises(ClientMessageError, match="时间戳.*超前"):
+        parse_client_message(
+            json.dumps(
+                {
+                    "type": "video_frame",
+                    "data": encode(b"\xff\xd8frame\xff\xd9"),
+                    "timestamp": 12_001,
+                    "sequence": 1,
+                }
+            ),
+            settings,
+            now_ms=10_000,
+        )
+
+
+def test_allows_video_frame_at_future_clock_skew_boundary(settings):
+    message = parse_client_message(
+        json.dumps(
+            {
+                "type": "video_frame",
+                "data": encode(b"\xff\xd8frame\xff\xd9"),
+                "timestamp": 12_000,
+                "sequence": 1,
+            }
+        ),
+        settings,
+        now_ms=10_000,
+    )
+
+    assert message.timestamp_ms == 12_000
+
+
 def test_uses_current_time_for_video_expiration(settings, monkeypatch):
-    monkeypatch.setattr(time, "time_ns", lambda: 10_000_000_000)
+    monkeypatch.setattr(messages.time, "time_ns", lambda: 10_000_000_000)
 
     with pytest.raises(ClientMessageError, match="过期"):
         parse_client_message(

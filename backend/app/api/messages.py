@@ -82,6 +82,8 @@ def _parse_text(value: object, max_chars: int) -> str:
 def _parse_base64(value: object, max_bytes: int) -> bytes:
     if not isinstance(value, str) or not value:
         raise ClientMessageError("媒体内容不能为空")
+    if len(value) > 4 * ((max_bytes + 2) // 3):
+        raise ClientMessageError(f"媒体内容过大，最多允许 {max_bytes} 字节")
 
     try:
         decoded = base64.b64decode(value, validate=True)
@@ -112,8 +114,11 @@ def _parse_video_frame(
 
     timestamp_ms = _parse_integer(payload.get("timestamp"), "timestamp")
     sequence = _parse_integer(payload.get("sequence"), "sequence")
-    if now_ms - timestamp_ms > settings.max_frame_age_ms:
+    age_ms = now_ms - timestamp_ms
+    if age_ms > settings.max_frame_age_ms:
         raise ClientMessageError("视频帧已过期")
+    if age_ms < -settings.max_frame_age_ms:
+        raise ClientMessageError("视频帧时间戳过于超前")
 
     return ClientMessage(
         type="video_frame",
