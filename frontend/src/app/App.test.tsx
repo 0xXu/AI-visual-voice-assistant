@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
@@ -8,6 +8,8 @@ const originalMediaDevicesDescriptor = Object.getOwnPropertyDescriptor(
 );
 
 afterEach(() => {
+  cleanup();
+
   if (originalMediaDevicesDescriptor) {
     Object.defineProperty(
       navigator,
@@ -34,5 +36,28 @@ describe("App", () => {
       screen.getByRole("button", { name: "开始视觉对话" }),
     ).toBeInTheDocument();
     expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("点击开始后请求设备并显示检测页面", async () => {
+    const stream = {
+      getTracks: () => [],
+      getAudioTracks: () => [{ enabled: true }],
+      getVideoTracks: () => [{ enabled: true }],
+    } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    const enumerateDevices = vi.fn().mockResolvedValue([
+      { deviceId: "cam-1", kind: "videoinput", label: "前置摄像头" },
+      { deviceId: "mic-1", kind: "audioinput", label: "内置麦克风" },
+    ]);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia, enumerateDevices },
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "开始视觉对话" }));
+
+    expect(await screen.findByText("检查摄像头与麦克风")).toBeInTheDocument();
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
   });
 });
