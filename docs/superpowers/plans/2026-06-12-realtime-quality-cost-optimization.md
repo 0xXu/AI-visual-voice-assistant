@@ -20,7 +20,7 @@
 - Gemini Live configuration, connection, response translation, and cleanup.
 - Idle timeout, maximum session duration, usage accounting, and token budget.
 - Server events for interruption, session ending, usage, GoAway, and resumption.
-- A versioned frontend integration contract.
+- A release-aware frontend integration contract.
 - Backend tests, operational defaults, and Chinese logs/errors.
 
 ### Frontend Project Owns
@@ -38,7 +38,9 @@ The backend must not add a `frontend/` directory or frontend dependencies. Front
 
 ## Pull Request Policy
 
-Each task below is exactly one PR and must contain one independently reviewable function.
+Each task below is exactly one PR and must deliver only that named task's
+coherent capability or documentation outcome. "One task" means one reviewable
+product behavior, not one Python function.
 
 1. Create the task branch only after the previous PR has merged into `main`.
 2. Branch from the latest remote `main`.
@@ -55,11 +57,13 @@ Each task below is exactly one PR and must contain one independently reviewable 
 Required verification for every PR:
 
 ```bash
-cd backend
-uv sync --locked
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv sync --locked)
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 ```
+
+All commands in this plan start from the repository root. Parenthesized
+backend commands do not change the shell's working directory.
 
 ---
 
@@ -96,24 +100,32 @@ rg -n 'frontend/(app|hooks|lib)' \
 
 Expected: no matches.
 
-- [ ] **Step 2: Verify the integration contract documents every current client message**
+- [ ] **Step 2: Verify the Released Protocol contains every current message heading**
 
 Run:
 
 ```bash
-rg -n 'ping|pong|audio|video_frame|text|turn_complete' \
-  docs/frontend-integration-contract.md
+released="$(mktemp)"
+sed -n '/^## Released Protocol$/,/^## Planned Protocol Evolution$/p' \
+  docs/frontend-integration-contract.md > "$released"
+for heading in \
+  "Client Ping" "Client Pong" "Client Text" "Client Audio" \
+  "Client Video Frame" "Server Connected Status" "Server Error" \
+  "Server Keepalive Ping" "Server Text" "Server Audio" \
+  "Server Turn Complete"; do
+  rg -q "^### ${heading}$" "$released" || exit 1
+done
+rm "$released"
 ```
 
-Expected: all currently released message types are present. Planned lifecycle
-messages are listed separately and marked with the PR that activates them.
+Expected: exit status 0. Planned lifecycle messages are outside the extracted
+Released Protocol section.
 
 - [ ] **Step 3: Run backend verification**
 
 ```bash
-cd backend
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 ```
 
 Expected: all tests pass and compilation exits successfully.
@@ -155,8 +167,7 @@ def test_parses_bounded_text_messages(settings): ...
 - [ ] **Step 2: Run focused tests and verify failure**
 
 ```bash
-cd backend
-uv run pytest tests/test_messages.py tests/test_config.py -q
+(cd backend && uv run pytest tests/test_messages.py tests/test_config.py -q)
 ```
 
 Expected: new validation cases fail before implementation.
@@ -176,8 +187,8 @@ Requirements:
 - [ ] **Step 4: Verify and commit**
 
 ```bash
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 git add backend/app/api/messages.py backend/app/core/config.py \
   backend/.env.example backend/tests/test_messages.py backend/tests/test_config.py \
   docs/frontend-integration-contract.md
@@ -214,8 +225,7 @@ async def test_close_is_race_safe_and_has_a_hard_timeout(): ...
 - [ ] **Step 2: Run focused tests and verify failure**
 
 ```bash
-cd backend
-uv run pytest tests/test_input_scheduler.py -q
+(cd backend && uv run pytest tests/test_input_scheduler.py -q)
 ```
 
 - [ ] **Step 3: Implement scheduler semantics**
@@ -232,8 +242,8 @@ Requirements:
 - [ ] **Step 4: Verify and commit**
 
 ```bash
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/input_scheduler.py \
   backend/tests/test_input_scheduler.py backend/app/api/websocket.py \
   backend/app/core/config.py backend/.env.example \
@@ -277,9 +287,8 @@ def test_timeout_settings_require_positive_values(): ...
 - [ ] **Step 2: Run focused tests and verify failure**
 
 ```bash
-cd backend
-uv run pytest tests/test_session_runtime.py tests/test_websocket.py \
-  tests/test_config.py -q
+(cd backend && uv run pytest tests/test_session_runtime.py \
+  tests/test_websocket.py tests/test_config.py -q)
 ```
 
 - [ ] **Step 3: Implement lifecycle behavior**
@@ -303,8 +312,8 @@ Use an injected clock or event-controlled waits for expiry decisions. Do not dep
 - [ ] **Step 5: Verify and commit**
 
 ```bash
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/session_runtime.py backend/app/api/messages.py \
   backend/tests/test_session_runtime.py backend/app/api/websocket.py \
   backend/app/core/config.py backend/.env.example \
@@ -351,9 +360,8 @@ Keep Google AI Studio API-key authentication only. Do not add Vertex AI settings
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-cd backend
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/gemini_service.py backend/app/core/config.py \
   backend/.env.example backend/tests/test_gemini_service.py \
   backend/tests/test_config.py
@@ -404,9 +412,8 @@ Then send one structured usage event and close only the cloud session, leaving t
 - [ ] **Step 4: Verify and commit**
 
 ```bash
-cd backend
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/usage.py backend/tests/test_usage.py \
   backend/app/services/session_runtime.py \
   backend/app/services/gemini_service.py backend/app/api/websocket.py \
@@ -441,9 +448,8 @@ The backend only forwards the event. The separate frontend is responsible for im
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-cd backend
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/gemini_service.py \
   backend/tests/test_gemini_service.py docs/frontend-integration-contract.md
 git commit -m "feat: expose Gemini interruption events"
@@ -484,9 +490,8 @@ async def test_invalid_handle_falls_back_to_clean_session(): ...
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-cd backend
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/gemini_service.py backend/app/api/websocket.py \
   backend/tests/test_gemini_service.py backend/tests/test_websocket.py \
   docs/frontend-integration-contract.md
@@ -530,10 +535,9 @@ Expected: no real API key and no backend `print()` calls.
 - [ ] **Step 3: Run final backend verification**
 
 ```bash
-cd backend
-uv sync --locked
-uv run pytest -q
-uv run python -m compileall -q app tests
+(cd backend && uv sync --locked)
+(cd backend && uv run pytest -q)
+(cd backend && uv run python -m compileall -q app tests)
 ```
 
 - [ ] **Step 4: Commit**

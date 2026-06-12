@@ -20,9 +20,26 @@ This contract distinguishes released behavior from planned behavior:
 
 - **Released** means the behavior exists on the current `main` branch.
 - **Planned** means the frontend may prepare support, but must not require the
-  behavior until the named backend PR has merged.
+  behavior until the named backend PR has merged and that commit is deployed.
 - Every backend PR that changes the protocol must update this document in the
   same PR.
+
+The current backend does not provide runtime capability negotiation. The
+deployment owner must publish the deployed backend commit SHA and protocol
+stage in release metadata consumed by the frontend deployment. A merged PR is
+not sufficient to enable a frontend feature.
+
+Protocol stages:
+
+| Stage | Available behavior |
+|---:|---|
+| 0 | Released Protocol in this document |
+| 1 | Task 1 bounded media protocol |
+| 2 | Task 2 bounded scheduler semantics |
+| 3 | Task 3 explicit session lifecycle |
+| 5 | Task 5 usage and budget events |
+| 6 | Task 6 interruption event |
+| 7 | Task 7 GoAway and resumption events |
 
 ## Endpoint
 
@@ -171,7 +188,7 @@ to finalize transcript or playback UI state.
 
 ### Task 1: Bounded Media Protocol
 
-Activated only after the Task 1 PR merges.
+Available only when the deployment reports protocol stage 1 or later.
 
 Changes:
 
@@ -196,7 +213,7 @@ Target video message:
 
 ### Task 2: Bounded Scheduler
 
-Activated only after the Task 2 PR merges.
+Available only when the deployment reports protocol stage 2 or later.
 
 Changes:
 
@@ -204,12 +221,10 @@ Changes:
 - The backend may return a Chinese backpressure error when a submission is
   already pending.
 - Only the newest pending video frame is retained.
-- The frontend should still perform visual-change detection and adaptive
-  sampling before upload.
 
 ### Task 3: Explicit Session Lifecycle
 
-Activated only after the Task 3 PR merges.
+Available only when the deployment reports protocol stage 3 or later.
 
 The browser WebSocket and Gemini cloud session become separate:
 
@@ -245,7 +260,7 @@ After Task 3 merges, keep the browser WebSocket open after a terminal status.
 
 ### Task 5: Usage And Budget
 
-Activated only after the Task 5 PR merges.
+Available only when the deployment reports protocol stage 5 or later.
 
 Target budget status:
 
@@ -289,7 +304,7 @@ The backend is the source of truth for limit enforcement.
 
 ### Task 6: Interruption
 
-Activated only after the Task 6 PR merges.
+Available only when the deployment reports protocol stage 6 or later.
 
 ```json
 {"type":"interrupted","data":""}
@@ -300,7 +315,7 @@ audio. Microphone capture may continue.
 
 ### Task 7: GoAway And Resumption
 
-Activated only after the Task 7 PR merges.
+Available only when the deployment reports protocol stage 7 or later.
 
 ```json
 {"type":"go_away","data":{"time_left_ms":5000}}
@@ -316,7 +331,8 @@ The frontend must not persist or replay the handle.
 ## Frontend Compatibility Rules
 
 - Implement the released protocol as the default behavior.
-- Feature-gate planned messages until the corresponding backend PR merges.
+- Feature-gate planned messages using the protocol stage supplied by the
+  deployment owner. Do not infer deployed capability from GitHub merge state.
 - Never send media before `connected`.
 - Reply to backend `ping` with `pong`.
 - Treat unknown message types and status values defensively without crashing.
