@@ -171,6 +171,19 @@ class GeminiSession:
                     yield GeminiResponse(usage_metadata=usage_metadata)
 
                 if server_content:
+                    input_transcription = getattr(
+                        server_content,
+                        "input_transcription",
+                        None,
+                    )
+                    if input_transcription and input_transcription.text:
+                        yield GeminiResponse(
+                            payload={
+                                "type": "user_text",
+                                "data": input_transcription.text,
+                            }
+                        )
+
                     output_transcription = getattr(
                         server_content,
                         "output_transcription",

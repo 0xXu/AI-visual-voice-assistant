@@ -40,6 +40,7 @@ Protocol stages:
 | 5 | Released: usage and budget events |
 | 6 | Released: interruption event |
 | 7 | Released: GoAway and transparent session resumption |
+| 8 | Released: user audio transcription event |
 
 ## Endpoint
 
@@ -278,6 +279,24 @@ close the WebSocket.
 
 The frontend should reply with `pong`.
 
+### Stage 8 Server User Text
+
+```json
+{"type":"user_text","data":"用户语音转写文本"}
+```
+
+When Gemini provides a non-empty input audio transcription, the backend
+forwards it as `user_text`. Input transcription may arrive in multiple
+fragments, including before or after a model `turn_complete` event. Append
+each fragment in arrival order to the current user voice turn.
+
+`turn_complete` ends only the current model response. The frontend must not
+use it to finalize or close the current user audio transcription.
+
+Deployments below protocol stage 8 do not send `user_text`. The frontend must
+degrade gracefully by keeping spoken turns usable without transcript text,
+for example by showing a generic voice-input marker instead.
+
 ### Server Text
 
 ```json
@@ -302,8 +321,8 @@ little-endian, mono PCM at 24 kHz.
 ```
 
 When Gemini reports an interruption, the backend emits this event at most
-once for that Gemini service message and before any usage, text, audio, or
-turn-complete event translated from the same message.
+once for that Gemini service message and before any usage, user-text, text,
+audio, or turn-complete event translated from the same message.
 
 On receipt, immediately stop current model playback and clear queued model
 audio. Microphone capture may continue.
