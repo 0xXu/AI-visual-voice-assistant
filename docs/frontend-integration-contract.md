@@ -34,12 +34,12 @@ Protocol stages:
 | Stage | Available behavior |
 |---:|---|
 | 0 | Legacy protocol before bounded media |
-| 1 | Released Protocol in this document: bounded media validation |
-| 2 | Task 2 bounded scheduler semantics |
-| 3 | Task 3 explicit session lifecycle |
-| 5 | Task 5 usage and budget events |
-| 6 | Task 6 interruption event |
-| 7 | Task 7 GoAway and resumption events |
+| 1 | Released: bounded media validation |
+| 2 | Released: bounded fair scheduler semantics |
+| 3 | Planned: explicit session lifecycle |
+| 5 | Planned: usage and budget events |
+| 6 | Planned: interruption event |
+| 7 | Planned: GoAway and resumption events |
 
 ## Endpoint
 
@@ -139,6 +139,23 @@ Requirements:
 - `timestamp` may differ from backend time by at most 2,000 ms in either
   direction by default.
 
+### Stage 2 Input Scheduling
+
+At protocol stage 2:
+
+- Audio and text use bounded queues, with default capacities of 32 audio
+  chunks and 8 text messages.
+- At most one blocked audio submission and one blocked text submission are
+  retained by the WebSocket reader. Additional input of the same type may
+  receive a Chinese backpressure error.
+- Video is latest-only. A newer accepted `sequence` replaces the pending
+  frame, and a sequence that does not exceed the highest previously accepted
+  sequence is ignored.
+- Text and audio are prioritized in bounded batches, while pending video is
+  still guaranteed progress.
+- WebSocket disconnect closes the scheduler, wakes blocked submitters, drains
+  queued input within a hard timeout, and then closes the Gemini session.
+
 ### Server Connected Status
 
 ```json
@@ -190,6 +207,17 @@ little-endian, mono PCM at 24 kHz.
 The current model response turn has finished. The frontend may use this event
 to finalize transcript or playback UI state.
 
+## Stage 1 Compatibility
+
+Stage 2 preserves every stage 1 message shape and validation rule. A stage 1
+frontend can connect to a stage 2 backend without adding lifecycle messages.
+Gemini Live is still created immediately, and ending the live session still
+closes the browser WebSocket.
+
+Deployments reporting protocol stage 1 provide bounded media validation but
+do not promise stage 2 queue bounds, backpressure errors, latest-only video,
+or fairness behavior.
+
 ## Stage 0 Compatibility
 
 Deployments reporting protocol stage 0 use the pre-bounded-media contract:
@@ -209,17 +237,6 @@ GitHub merge state.
 ---
 
 ## Planned Protocol Evolution
-
-### Task 2: Bounded Scheduler
-
-Available only when the deployment reports protocol stage 2 or later.
-
-Changes:
-
-- Text and audio submissions are bounded.
-- The backend may return a Chinese backpressure error when a submission is
-  already pending.
-- Only the newest pending video frame is retained.
 
 ### Task 3: Explicit Session Lifecycle
 
