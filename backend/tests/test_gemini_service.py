@@ -6,6 +6,7 @@ from google.genai import types
 from app.core.config import Settings
 from app.services import gemini_service
 from app.services.gemini_service import (
+    GeminiResponse,
     GeminiLiveService,
     GeminiSession,
     SYSTEM_PROMPT,
@@ -134,3 +135,25 @@ def test_sends_video_and_text_as_realtime_input():
 
     assert fake_session.calls[0]["video"].mime_type == "image/jpeg"
     assert fake_session.calls[1] == {"text": "你好"}
+
+
+def test_maps_live_server_usage_metadata_with_sdk_type():
+    metadata = types.UsageMetadata(
+        prompt_token_count=12,
+        response_token_count=3,
+        total_token_count=15,
+    )
+
+    class ReceivingSession:
+        async def receive(self):
+            yield types.LiveServerMessage(usage_metadata=metadata)
+
+    async def collect():
+        return [
+            event
+            async for event in GeminiSession(ReceivingSession()).receive()
+        ]
+
+    assert asyncio.run(collect()) == [
+        GeminiResponse(usage_metadata=metadata)
+    ]

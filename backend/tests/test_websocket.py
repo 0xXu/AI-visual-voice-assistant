@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import pytest
 from fastapi import WebSocketDisconnect
+from google.genai import types
 from starlette.websockets import WebSocketState
 
 from app.api import messages, websocket as websocket_api
@@ -16,10 +17,12 @@ from app.api.websocket import (
     _wait_for_start,
 )
 from app.services.input_scheduler import InputScheduler
+from app.services.gemini_service import GeminiResponse
 from app.services.session_runtime import (
     SessionIdleTimeout,
     SessionLifetimeExceeded,
 )
+from app.services.usage import SessionUsage
 
 
 class FakeWebSocket:
@@ -379,6 +382,10 @@ def test_stop_sends_stopped_and_allows_repeated_sessions():
 
         websocket = FakeWebSocket([
             json.dumps({"type": "start_session", "data": ""}),
+            json.dumps({
+                "type": "audio",
+                "data": base64.b64encode(b"data").decode("ascii"),
+            }),
             json.dumps({"type": "stop_session", "data": ""}),
             json.dumps({"type": "start_session", "data": ""}),
             json.dumps({"type": "stop_session", "data": ""}),
@@ -388,12 +395,24 @@ def test_stop_sends_stopped_and_allows_repeated_sessions():
 
         assert len(services) == 2
         assert all(service.released for service in services)
-        assert websocket.sent == [
+        assert [
+            message
+            for message in websocket.sent
+            if message["type"] == "status"
+        ] == [
             {"type": "status", "data": "connected"},
             {"type": "status", "data": "stopped"},
             {"type": "status", "data": "connected"},
             {"type": "status", "data": "stopped"},
         ]
+        usage_events = [
+            message["data"]
+            for message in websocket.sent
+            if message["type"] == "usage"
+        ]
+        assert len(usage_events) == 2
+        assert usage_events[0]["audio_bytes"] == 4
+        assert usage_events[1]["audio_bytes"] == 0
 
     asyncio.run(scenario())
 
@@ -447,10 +466,15 @@ def test_runtime_expiration_sends_distinct_status(
         )
 
         assert service.released
-        assert websocket.sent == [
+        assert websocket.sent[0:2] == [
             {"type": "status", "data": "connected"},
             {"type": "status", "data": expected_status},
         ]
+        assert websocket.sent[2]["type"] == "usage"
+        assert sum(
+            message["type"] == "usage"
+            for message in websocket.sent
+        ) == 1
 
     asyncio.run(scenario())
 
@@ -571,10 +595,86 @@ def test_natural_gemini_stream_end_sends_stopped():
         )
 
         assert service.released
-        assert websocket.sent == [
+        assert websocket.sent[0:2] == [
             {"type": "status", "data": "connected"},
             {"type": "status", "data": "stopped"},
         ]
+        assert websocket.sent[2]["type"] == "usage"
+        assert sum(
+            message["type"] == "usage"
+            for message in websocket.sent
+        ) == 1
+
+    asyncio.run(scenario())
+
+
+def test_budget_end_closes_cloud_session_and_sends_one_final_usage():
+    async def scenario():
+        budget_status_sent = asyncio.Event()
+        input_send_started = asyncio.Event()
+        input_send_cancelled = asyncio.Event()
+
+        class BudgetSession(RecordingSession):
+            async def send_text(self, data):
+                assert data == "accepted"
+                input_send_started.set()
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    input_send_cancelled.set()
+                    raise
+
+            async def receive(self):
+                await input_send_started.wait()
+                yield GeminiResponse(
+                    usage_metadata=types.UsageMetadata(
+                        prompt_token_count=8,
+                        response_token_count=2,
+                        total_token_count=10,
+                    )
+                )
+
+        class DisconnectAfterUsageWebSocket(FakeWebSocket):
+            async def receive_text(self):
+                try:
+                    return next(self.messages)
+                except StopIteration:
+                    await budget_status_sent.wait()
+                    raise WebSocketDisconnect()
+
+            async def send_json(self, payload):
+                await super().send_json(payload)
+                if payload == {
+                    "type": "status",
+                    "data": "budget_exceeded",
+                }:
+                    budget_status_sent.set()
+
+        service = FakeService(BudgetSession())
+        websocket = DisconnectAfterUsageWebSocket([
+            json.dumps({"type": "start_session", "data": ""}),
+            json.dumps({"type": "text", "data": "accepted"}),
+        ])
+
+        await _serve_websocket(
+            websocket,
+            service_factory=lambda: service,
+            usage_factory=lambda: SessionUsage(token_budget=10),
+        )
+
+        assert service.released
+        assert input_send_cancelled.is_set()
+        assert websocket.sent[0:2] == [
+            {"type": "status", "data": "connected"},
+            {"type": "status", "data": "budget_exceeded"},
+        ]
+        assert websocket.sent[2]["type"] == "usage"
+        assert websocket.sent[2]["data"]["text_chars"] == 8
+        assert websocket.sent[2]["data"]["total_tokens"] == 10
+        assert sum(
+            message["type"] == "usage"
+            for message in websocket.sent
+        ) == 1
 
     asyncio.run(scenario())
 

@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from app.services import input_scheduler
-from app.services.input_scheduler import InputScheduler
+from app.services.input_scheduler import InputScheduler, VideoSubmission
 
 
 class FakeSession:
@@ -74,9 +74,11 @@ def test_text_queue_capacity_must_be_positive():
 def test_latest_video_frame_replaces_older_pending_frame():
     scheduler = InputScheduler(audio_capacity=4)
 
-    scheduler.submit_video(b"old", sequence=1)
-    scheduler.submit_video(b"new", sequence=2)
+    accepted = scheduler.submit_video(b"old", sequence=1)
+    replaced = scheduler.submit_video(b"new", sequence=2)
 
+    assert accepted is VideoSubmission.ACCEPTED
+    assert replaced is VideoSubmission.REPLACED
     assert scheduler.take_latest_video() == (b"new", 2)
     assert scheduler.take_latest_video() is None
 
@@ -85,8 +87,9 @@ def test_older_video_frame_cannot_replace_newer_pending_frame():
     scheduler = InputScheduler(audio_capacity=4)
 
     scheduler.submit_video(b"new", sequence=2)
-    scheduler.submit_video(b"old", sequence=1)
+    rejected = scheduler.submit_video(b"old", sequence=1)
 
+    assert rejected is VideoSubmission.REJECTED
     assert scheduler.take_latest_video() == (b"new", 2)
 
 

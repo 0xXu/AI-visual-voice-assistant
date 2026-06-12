@@ -10,12 +10,13 @@ from starlette.websockets import WebSocketState
 from app.api.messages import ClientMessageError, parse_client_message
 from app.core.config import ConfigurationError, settings
 from app.services.gemini_service import GeminiLiveService, GeminiSession
-from app.services.input_scheduler import InputScheduler
+from app.services.input_scheduler import InputScheduler, VideoSubmission
 from app.services.session_runtime import (
     SessionIdleTimeout,
     SessionLifetimeExceeded,
     SessionRuntime,
 )
+from app.services.usage import SessionUsage
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,6 +28,7 @@ _TEXT_BACKPRESSURE_ERROR = "文本输入处理繁忙，请稍后重试"
 class SessionEndReason(Enum):
     STOPPED = "stopped"
     SESSION_ENDED = "session_ended"
+    BUDGET_EXCEEDED = "budget_exceeded"
 
 
 def _observe_task_result(task: asyncio.Task[object]) -> None:
@@ -74,16 +76,33 @@ async def _send_error(websocket: WebSocket, message: str) -> None:
 async def _forward_gemini_responses(
     websocket: WebSocket,
     session: GeminiSession,
-) -> None:
+    usage: SessionUsage,
+) -> SessionEndReason:
     async for response in session.receive():
-        await websocket.send_json(response)
+        if response.usage_metadata is not None:
+            usage.record_gemini_usage(response.usage_metadata)
+            if usage.budget_exceeded:
+                logger.info(
+                    "会话 token 预算已用尽：%s/%s",
+                    usage.total_tokens,
+                    usage.token_budget,
+                )
+                return SessionEndReason.BUDGET_EXCEEDED
+        if response.payload is not None:
+            if response.model_output:
+                usage.record_response()
+            await websocket.send_json(response.payload)
+    return SessionEndReason.SESSION_ENDED
 
 
 async def _record_activity_after(
     submission: Awaitable[None],
     runtime: SessionRuntime | None,
+    record_usage: Callable[[], None] | None = None,
 ) -> None:
     await submission
+    if record_usage is not None:
+        record_usage()
     if runtime is not None:
         runtime.record_activity()
 
@@ -92,10 +111,10 @@ async def _forward_client_messages(
     websocket: WebSocket,
     scheduler: InputScheduler,
     runtime: SessionRuntime | None = None,
+    usage: SessionUsage | None = None,
 ) -> SessionEndReason:
     pending_audio: asyncio.Task[None] | None = None
     pending_text: asyncio.Task[None] | None = None
-    highest_video_sequence: int | None = None
 
     try:
         while True:
@@ -130,10 +149,16 @@ async def _forward_client_messages(
                         _AUDIO_BACKPRESSURE_ERROR,
                     )
                     continue
+                record_audio = None
+                if usage is not None:
+                    record_audio = (
+                        lambda data=message.data: usage.record_audio(data)
+                    )
                 pending_audio = asyncio.create_task(
                     _record_activity_after(
                         scheduler.submit_audio(message.data),
                         runtime,
+                        record_audio,
                     ),
                     name="提交音频输入",
                 )
@@ -141,15 +166,22 @@ async def _forward_client_messages(
             elif message.type == "video_frame":
                 assert isinstance(message.data, bytes)
                 assert message.sequence is not None
-                scheduler.submit_video(message.data, message.sequence)
+                submission = scheduler.submit_video(
+                    message.data,
+                    message.sequence,
+                )
+                if (
+                    usage is not None
+                    and submission is not VideoSubmission.REJECTED
+                ):
+                    usage.record_video(
+                        message.data,
+                        replaced=submission is VideoSubmission.REPLACED,
+                    )
                 if (
                     runtime is not None
-                    and (
-                        highest_video_sequence is None
-                        or message.sequence > highest_video_sequence
-                    )
+                    and submission is not VideoSubmission.REJECTED
                 ):
-                    highest_video_sequence = message.sequence
                     runtime.record_activity()
             elif message.type == "text":
                 assert isinstance(message.data, str)
@@ -159,10 +191,16 @@ async def _forward_client_messages(
                         _TEXT_BACKPRESSURE_ERROR,
                     )
                     continue
+                record_text = None
+                if usage is not None:
+                    record_text = (
+                        lambda data=message.data: usage.record_text(data)
+                    )
                 pending_text = asyncio.create_task(
                     _record_activity_after(
                         scheduler.submit_text(message.data),
                         runtime,
+                        record_text,
                     ),
                     name="提交文本输入",
                 )
@@ -212,13 +250,20 @@ def _create_runtime() -> SessionRuntime:
     )
 
 
+def _create_usage() -> SessionUsage:
+    return SessionUsage(token_budget=settings.session_token_budget)
+
+
 async def _run_session(
     websocket: WebSocket,
     session: GeminiSession,
     runtime: SessionRuntime | None = None,
+    usage: SessionUsage | None = None,
 ) -> SessionEndReason:
     if runtime is None:
         runtime = _create_runtime()
+    if usage is None:
+        usage = _create_usage()
 
     scheduler = InputScheduler(
         audio_capacity=settings.audio_queue_capacity,
@@ -229,11 +274,11 @@ async def _run_session(
         name="发送模型输入",
     )
     client_task = asyncio.create_task(
-        _forward_client_messages(websocket, scheduler, runtime),
+        _forward_client_messages(websocket, scheduler, runtime, usage),
         name="接收客户端消息",
     )
     response_task = asyncio.create_task(
-        _forward_gemini_responses(websocket, session),
+        _forward_gemini_responses(websocket, session, usage),
         name="转发模型响应",
     )
     tasks = {
@@ -272,36 +317,47 @@ async def _run_session(
                 ):
                     continue
                 raise exception
-        if response_task in done:
-            end_reason = SessionEndReason.STOPPED
+        if (
+            response_task in done
+            and end_reason is not SessionEndReason.STOPPED
+        ):
+            end_reason = response_task.result()
     finally:
         scheduler_exception: BaseException | None = None
-        await scheduler.close()
-        try:
-            await asyncio.wait_for(
-                asyncio.shield(scheduler_task),
-                timeout=settings.scheduler_shutdown_timeout_seconds,
-            )
-        except TimeoutError:
+        if end_reason is SessionEndReason.BUDGET_EXCEEDED:
             scheduler_task.cancel()
-        except asyncio.CancelledError:
-            scheduler_task.cancel()
-            raise
-        except Exception as exc:
-            scheduler_exception = exc
-        finally:
+            await scheduler.close()
             await _cancel_tasks_with_timeout(
                 tasks,
                 settings.scheduler_shutdown_timeout_seconds,
             )
-        if (
-            scheduler_exception is None
-            and scheduler_task.done()
-            and not scheduler_task.cancelled()
-        ):
-            scheduler_exception = scheduler_task.exception()
-        if scheduler_exception is not None:
-            raise scheduler_exception
+        else:
+            await scheduler.close()
+            try:
+                await asyncio.wait_for(
+                    asyncio.shield(scheduler_task),
+                    timeout=settings.scheduler_shutdown_timeout_seconds,
+                )
+            except TimeoutError:
+                scheduler_task.cancel()
+            except asyncio.CancelledError:
+                scheduler_task.cancel()
+                raise
+            except Exception as exc:
+                scheduler_exception = exc
+            finally:
+                await _cancel_tasks_with_timeout(
+                    tasks,
+                    settings.scheduler_shutdown_timeout_seconds,
+                )
+            if (
+                scheduler_exception is None
+                and scheduler_task.done()
+                and not scheduler_task.cancelled()
+            ):
+                scheduler_exception = scheduler_task.exception()
+            if scheduler_exception is not None:
+                raise scheduler_exception
     return end_reason
 
 
@@ -310,6 +366,7 @@ async def _serve_websocket(
     *,
     service_factory: Callable[[], GeminiLiveService] = GeminiLiveService,
     runtime_factory: Callable[[], SessionRuntime] = _create_runtime,
+    usage_factory: Callable[[], SessionUsage] = _create_usage,
 ) -> None:
     await websocket.accept()
     logger.info("客户端已连接")
@@ -319,7 +376,10 @@ async def _serve_websocket(
             await _wait_for_start(websocket)
             try:
                 service = service_factory()
+                terminal_status = "stopped"
+                usage: SessionUsage | None = None
                 async with service.connect() as session:
+                    usage = usage_factory()
                     await websocket.send_json({
                         "type": "status",
                         "data": "connected",
@@ -333,23 +393,29 @@ async def _serve_websocket(
                             websocket,
                             session,
                             runtime_factory(),
+                            usage,
                         )
                     except SessionIdleTimeout:
-                        await websocket.send_json({
-                            "type": "status",
-                            "data": "idle_timeout",
-                        })
+                        terminal_status = "idle_timeout"
                     except SessionLifetimeExceeded:
-                        await websocket.send_json({
-                            "type": "status",
-                            "data": "max_duration",
-                        })
+                        terminal_status = "max_duration"
                     else:
-                        if reason is SessionEndReason.STOPPED:
-                            await websocket.send_json({
-                                "type": "status",
-                                "data": "stopped",
-                            })
+                        if reason is SessionEndReason.BUDGET_EXCEEDED:
+                            terminal_status = "budget_exceeded"
+                assert usage is not None
+                await websocket.send_json({
+                    "type": "status",
+                    "data": terminal_status,
+                })
+                await websocket.send_json({
+                    "type": "usage",
+                    "data": usage.to_dict(),
+                })
+                logger.info(
+                    "云会话已结束，状态：%s，token：%s",
+                    terminal_status,
+                    usage.total_tokens,
+                )
             except ConfigurationError as exc:
                 logger.error("Gemini 配置错误：%s", exc)
                 await _send_error(

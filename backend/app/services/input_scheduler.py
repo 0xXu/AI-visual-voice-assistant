@@ -1,6 +1,7 @@
 import asyncio
 from collections import deque
 from dataclasses import dataclass
+from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,6 +10,12 @@ if TYPE_CHECKING:
 
 class SchedulerClosed(RuntimeError):
     """The input scheduler no longer accepts work."""
+
+
+class VideoSubmission(Enum):
+    ACCEPTED = "accepted"
+    REPLACED = "replaced"
+    REJECTED = "rejected"
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,15 +49,20 @@ class InputScheduler:
     async def submit_text(self, text: str) -> None:
         await self._submit(self._text, self._text_capacity, text)
 
-    def submit_video(self, data: bytes, sequence: int) -> None:
+    def submit_video(self, data: bytes, sequence: int) -> VideoSubmission:
         self._raise_if_closed()
         if (
             self._highest_seen_video_sequence is None
             or sequence > self._highest_seen_video_sequence
         ):
+            replaced = self._latest_video is not None
             self._highest_seen_video_sequence = sequence
             self._latest_video = PendingVideo(data, sequence)
             self._wake.set()
+            if replaced:
+                return VideoSubmission.REPLACED
+            return VideoSubmission.ACCEPTED
+        return VideoSubmission.REJECTED
 
     async def take_audio(self) -> bytes:
         async with self._condition:

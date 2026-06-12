@@ -188,7 +188,7 @@ Requirements:
 - Reject frames older or further in the future than `MAX_FRAME_AGE_MS`.
 - Return Chinese client-facing errors.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 (cd backend && uv run pytest -q)
@@ -249,7 +249,7 @@ Requirements:
 - Shutdown wakes blocked producers, propagates drain failures, and has a hard timeout.
 - The WebSocket remains the only task reading client messages.
 
-- [x] **Step 4: Verify and commit**
+- [ ] **Step 4: Verify and commit**
 
 ```bash
 (cd backend && uv run pytest -q)
@@ -398,19 +398,23 @@ This task does not change the WebSocket wire protocol, so
 **Files:**
 - Create: `backend/app/services/usage.py`
 - Create: `backend/tests/test_usage.py`
-- Modify: `backend/app/services/session_runtime.py`
 - Modify: `backend/app/services/gemini_service.py`
+- Modify: `backend/app/services/input_scheduler.py`
 - Modify: `backend/app/api/websocket.py`
 - Modify: `backend/app/core/config.py`
 - Modify: `backend/.env.example`
+- Modify: `backend/tests/test_gemini_service.py`
+- Modify: `backend/tests/test_config.py`
 - Modify: `backend/tests/test_websocket.py`
 - Modify: `docs/frontend-integration-contract.md`
+- Modify: `README.md`
 
-- [ ] **Step 1: Write failing accounting tests**
+- [x] **Step 1: Write failing accounting tests**
 
-Cover byte/frame counters, token accumulation, latency calculation, budget exhaustion, and one final usage event.
+Cover byte/frame counters, token accumulation, latency calculation, budget
+exhaustion, one final usage event, and repeated-session counter reset.
 
-- [ ] **Step 2: Implement `SessionUsage`**
+- [x] **Step 2: Implement `SessionUsage`**
 
 Use a focused dataclass that records:
 
@@ -420,7 +424,17 @@ Use a focused dataclass that records:
 - input/output/total tokens from Gemini usage metadata;
 - session duration and response latency.
 
-- [ ] **Step 3: Enforce the budget**
+google-genai 2.8.0 exposes these fields through the real
+`types.LiveServerMessage.usage_metadata: types.UsageMetadata | None` type:
+
+- `prompt_token_count`;
+- `response_token_count`;
+- `total_token_count`.
+
+The latest-frame scheduler returns whether a newly accepted frame replaced a
+pending frame, so replacement counts do not rely on inferred timing.
+
+- [x] **Step 3: Enforce the budget**
 
 When total tokens reach `SESSION_TOKEN_BUDGET`, stop forwarding new input, send:
 
@@ -430,17 +444,24 @@ When total tokens reach `SESSION_TOKEN_BUDGET`, stop forwarding new input, send:
 
 Then send one structured usage event and close only the cloud session, leaving the browser WebSocket ready for a later `start_session`.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
+(cd backend && uv run pytest -q tests/test_usage.py \
+  tests/test_gemini_service.py tests/test_websocket.py \
+  tests/test_config.py tests/test_input_scheduler.py)
 (cd backend && uv run pytest -q)
 (cd backend && uv run python -m compileall -q app tests)
 git add backend/app/services/usage.py backend/tests/test_usage.py \
-  backend/app/services/session_runtime.py \
-  backend/app/services/gemini_service.py backend/app/api/websocket.py \
+  backend/app/services/gemini_service.py \
+  backend/app/services/input_scheduler.py backend/app/api/websocket.py \
   backend/app/core/config.py backend/.env.example \
-  backend/tests/test_websocket.py docs/frontend-integration-contract.md
-git commit -m "feat: enforce per session usage budget"
+  backend/tests/test_gemini_service.py backend/tests/test_config.py \
+  backend/tests/test_input_scheduler.py backend/tests/test_websocket.py \
+  docs/frontend-integration-contract.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md \
+  README.md
+git commit -m "Task5：增加会话用量统计与 token 预算"
 ```
 
 ---
