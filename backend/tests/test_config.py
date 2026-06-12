@@ -102,6 +102,7 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
     assert settings.max_video_bytes == 524_288
     assert settings.max_frame_age_ms == 2_000
     assert settings.max_text_chars == 2_000
+    assert settings.audio_queue_capacity == 32
 
 
 @pytest.mark.parametrize(
@@ -111,6 +112,7 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
         "MAX_VIDEO_BYTES",
         "MAX_FRAME_AGE_MS",
         "MAX_TEXT_CHARS",
+        "AUDIO_QUEUE_CAPACITY",
     ],
 )
 @pytest.mark.parametrize("value", [0, -1])

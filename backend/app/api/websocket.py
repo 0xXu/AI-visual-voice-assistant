@@ -8,6 +8,7 @@ from starlette.websockets import WebSocketState
 from app.api.messages import ClientMessageError, parse_client_message
 from app.core.config import ConfigurationError, settings
 from app.services.gemini_service import GeminiLiveService, GeminiSession
+from app.services.input_scheduler import InputScheduler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,7 +29,7 @@ async def _forward_gemini_responses(
 
 async def _forward_client_messages(
     websocket: WebSocket,
-    session: GeminiSession,
+    scheduler: InputScheduler,
 ) -> None:
     while True:
         raw_message = await websocket.receive_text()
@@ -44,11 +45,15 @@ async def _forward_client_messages(
         elif message.type == "pong":
             continue
         elif message.type == "audio":
-            await session.send_audio(message.data)
+            assert isinstance(message.data, bytes)
+            await scheduler.submit_audio(message.data)
         elif message.type == "video_frame":
-            await session.send_video_frame(message.data)
+            assert isinstance(message.data, bytes)
+            assert message.sequence is not None
+            scheduler.submit_video(message.data, message.sequence)
         elif message.type == "text":
-            await session.send_text(message.data)
+            assert isinstance(message.data, str)
+            await scheduler.submit_text(message.data)
 
 
 async def _keepalive(websocket: WebSocket) -> None:
@@ -61,11 +66,19 @@ async def _run_session(
     websocket: WebSocket,
     session: GeminiSession,
 ) -> None:
+    scheduler = InputScheduler(
+        audio_capacity=settings.audio_queue_capacity,
+    )
+    scheduler_task = asyncio.create_task(
+        scheduler.run(session),
+        name="发送模型输入",
+    )
     tasks = {
         asyncio.create_task(
-            _forward_client_messages(websocket, session),
+            _forward_client_messages(websocket, scheduler),
             name="接收客户端消息",
         ),
+        scheduler_task,
         asyncio.create_task(
             _forward_gemini_responses(websocket, session),
             name="转发模型响应",
@@ -86,8 +99,10 @@ async def _run_session(
             if exception:
                 raise exception
     finally:
+        await scheduler.close()
         for task in tasks:
-            task.cancel()
+            if task is not scheduler_task:
+                task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
 

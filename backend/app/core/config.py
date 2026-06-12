@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     max_video_bytes: PositiveInt = 524_288
     max_frame_age_ms: PositiveInt = 2_000
     max_text_chars: PositiveInt = 2_000
+    audio_queue_capacity: PositiveInt = 32
 
     model_config = SettingsConfigDict(
         env_file=".env",
