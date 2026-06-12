@@ -256,7 +256,8 @@ Target terminal statuses:
 | `idle_timeout` | No accepted input for 45 seconds by default | Stop media; allow restart |
 | `max_duration` | Session reached 600 seconds by default | Stop media; allow restart |
 
-After Task 3 merges, keep the browser WebSocket open after a terminal status.
+At deployed protocol stage 3 or later, keep the browser WebSocket open after
+a terminal status.
 
 ### Task 5: Usage And Budget
 
