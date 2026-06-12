@@ -1,0 +1,47 @@
+:root {
+  color-scheme: dark;
+
+  --color-bg: #030913;
+  --color-bg-elevated: #071522;
+  --color-surface: #0d2234;
+  --color-surface-alt: #102a40;
+  --color-surface-hover: #15344b;
+  --color-overlay: rgba(3, 12, 20, 0.76);
+
+  --color-border: rgba(135, 220, 255, 0.2);
+  --color-border-hover: rgba(135, 220, 255, 0.42);
+
+  --color-text: #effbff;
+  --color-text-secondary: #b8d0dc;
+  --color-text-tertiary: #91adbd;
+
+  --color-accent: #70ddff;
+  --color-accent-hover: #94e7ff;
+  --color-accent-secondary: #7598ff;
+
+  --color-success: #65e6bf;
+  --color-warning: #ffd071;
+  --color-error: #ff7186;
+
+  --color-bg-rgb: 3, 9, 19;
+  --color-surface-rgb: 13, 34, 52;
+  --color-accent-rgb: 112, 221, 255;
+  --color-accent-secondary-rgb: 117, 152, 255;
+  --color-success-rgb: 101, 230, 191;
+  --color-warning-rgb: 255, 208, 113;
+  --color-error-rgb: 255, 113, 134;
+
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+    "Inter Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+}
