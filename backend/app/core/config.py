@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     audio_queue_capacity: PositiveInt = 32
     text_queue_capacity: PositiveInt = 8
     scheduler_shutdown_timeout_seconds: PositiveFloat = 1.0
+    session_idle_seconds: PositiveFloat = 45.0
+    session_max_seconds: PositiveFloat = 600.0
 
     model_config = SettingsConfigDict(
         env_file=".env",

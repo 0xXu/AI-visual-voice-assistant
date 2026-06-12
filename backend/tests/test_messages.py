@@ -81,9 +81,14 @@ def test_allows_even_audio_at_max_bytes(settings):
 
 
 @pytest.mark.parametrize("message_type", ["start_session", "stop_session"])
-def test_rejects_unreleased_lifecycle_messages(settings, message_type):
-    with pytest.raises(ClientMessageError, match="不支持"):
-        parse_client_message(json.dumps({"type": message_type}), settings)
+def test_parses_lifecycle_messages(settings, message_type):
+    message = parse_client_message(
+        json.dumps({"type": message_type, "data": ""}),
+        settings,
+    )
+
+    assert message.type == message_type
+    assert message.data is None
 
 
 def test_rejects_odd_length_pcm16_audio(settings):
