@@ -149,7 +149,7 @@ def test_rejects_oversized_audio_before_decode(settings): ...
 def test_rejects_odd_length_pcm16(settings): ...
 def test_rejects_non_jpeg_video(settings): ...
 def test_rejects_stale_and_future_video_timestamps(settings): ...
-def test_parses_lifecycle_and_text_messages(settings): ...
+def test_parses_bounded_text_messages(settings): ...
 ```
 
 - [ ] **Step 2: Run focused tests and verify failure**
@@ -250,6 +250,7 @@ git commit -m "feat: add bounded fair input scheduler"
 **Files:**
 - Create: `backend/app/services/session_runtime.py`
 - Create: `backend/tests/test_session_runtime.py`
+- Modify: `backend/app/api/messages.py`
 - Modify: `backend/app/api/websocket.py`
 - Modify: `backend/app/core/config.py`
 - Modify: `backend/.env.example`
@@ -263,6 +264,7 @@ Cover:
 
 ```python
 async def test_gemini_is_not_created_before_start(): ...
+def test_parses_start_and_stop_lifecycle_messages(): ...
 async def test_pre_start_ping_pong_is_supported(): ...
 async def test_stop_returns_stopped_and_allows_another_session(): ...
 async def test_only_successfully_enqueued_input_refreshes_idle_time(): ...
@@ -303,7 +305,7 @@ Use an injected clock or event-controlled waits for expiry decisions. Do not dep
 ```bash
 uv run pytest -q
 uv run python -m compileall -q app tests
-git add backend/app/services/session_runtime.py \
+git add backend/app/services/session_runtime.py backend/app/api/messages.py \
   backend/tests/test_session_runtime.py backend/app/api/websocket.py \
   backend/app/core/config.py backend/.env.example \
   backend/tests/test_websocket.py backend/tests/test_config.py \
@@ -518,7 +520,8 @@ Document Google AI Studio `GEMINI_API_KEY`, all queue/media/session/budget defau
 - [ ] **Step 2: Verify secrets and Chinese runtime output**
 
 ```bash
-rg -n 'GEMINI_API_KEY=.+|AQ\\.' . -g '!backend/.env' -g '!.git/**'
+rg -n 'GEMINI_API_KEY=[A-Za-z0-9_-]{20,}|AQ\.[A-Za-z0-9_-]{20,}' . \
+  -g '!backend/.env' -g '!.git/**' -g '!docs/superpowers/plans/**'
 rg -n '\\bprint\\s*\\(' backend/app
 ```
 

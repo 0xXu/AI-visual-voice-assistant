@@ -260,15 +260,30 @@ Target usage event:
   "type":"usage",
   "data":{
     "audio_bytes":32000,
+    "text_chars":120,
     "video_frames":8,
+    "video_replaced_frames":3,
     "video_bytes":180000,
     "input_tokens":1200,
     "output_tokens":340,
     "total_tokens":1540,
-    "duration_ms":25000
+    "duration_ms":25000,
+    "first_response_latency_ms":480
   }
 }
 ```
+
+Field meanings:
+
+- `audio_bytes`: accepted client audio bytes.
+- `text_chars`: accepted client text characters.
+- `video_frames`: accepted client video frames.
+- `video_replaced_frames`: pending frames replaced before cloud forwarding.
+- `video_bytes`: accepted client video bytes.
+- `input_tokens`, `output_tokens`, `total_tokens`: Gemini usage metadata.
+- `duration_ms`: cloud-session duration.
+- `first_response_latency_ms`: delay from the first accepted input to the
+  first model output.
 
 The backend is the source of truth for limit enforcement.
 
