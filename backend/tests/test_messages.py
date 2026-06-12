@@ -95,6 +95,47 @@ def test_rejects_oversized_base64_before_decoding(settings, monkeypatch):
         )
 
 
+@pytest.mark.parametrize(
+    ("decoded_size", "max_bytes", "expected_padding", "same_encoded_length"),
+    [
+        pytest.param(6, 4, 0, True, id="padding-0-over-by-2"),
+        pytest.param(5, 4, 1, True, id="padding-1-over-by-1"),
+        pytest.param(4, 3, 2, False, id="padding-2-over-by-1"),
+    ],
+)
+def test_rejects_exact_oversized_base64_before_decoding(
+    monkeypatch,
+    decoded_size,
+    max_bytes,
+    expected_padding,
+    same_encoded_length,
+):
+    encoded = encode(b"x" * decoded_size)
+    assert len(encoded) - len(encoded.rstrip("=")) == expected_padding
+    assert (len(encoded) == len(encode(b"x" * max_bytes))) is same_encoded_length
+
+    def fail_if_called(*args, **kwargs):
+        pytest.fail("oversized Base64 payload must not be decoded")
+
+    monkeypatch.setattr(messages.base64, "b64decode", fail_if_called)
+
+    with pytest.raises(ClientMessageError, match="过大"):
+        messages._parse_base64(encoded, max_bytes)
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    [
+        "A" * 13,
+        "A" * 11 + "%",
+        "A" * 10 + "=A",
+    ],
+)
+def test_invalid_base64_is_not_misclassified_as_oversized(encoded):
+    with pytest.raises(ClientMessageError, match="不是有效的 Base64"):
+        messages._parse_base64(encoded, max_bytes=8)
+
+
 def test_parses_jpeg_video_with_timestamp_and_sequence(settings):
     jpeg = b"\xff\xd8frame\xff\xd9"
 

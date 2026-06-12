@@ -1,11 +1,17 @@
 import base64
 import binascii
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Literal
 
 from app.core.config import Settings
+
+
+_BASE64_PATTERN = re.compile(
+    r"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"
+)
 
 
 MessageType = Literal[
@@ -80,7 +86,12 @@ def _parse_text(value: object, max_chars: int) -> str:
 def _parse_base64(value: object, max_bytes: int) -> bytes:
     if not isinstance(value, str) or not value:
         raise ClientMessageError("媒体内容不能为空")
-    if len(value) > 4 * ((max_bytes + 2) // 3):
+    if _BASE64_PATTERN.fullmatch(value) is None:
+        raise ClientMessageError("媒体内容不是有效的 Base64 数据")
+
+    padding = len(value) - len(value.rstrip("="))
+    candidate_bytes = (len(value) // 4) * 3 - padding
+    if candidate_bytes > max_bytes:
         raise ClientMessageError(f"媒体内容过大，最多允许 {max_bytes} 字节")
 
     try:
