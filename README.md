@@ -50,8 +50,10 @@
 - `/ws` 提供实时双向通信。
 - 并行处理客户端输入、模型响应和连接心跳。
 - 支持 `ping`、`pong` 保活消息。
-- 任一主要任务结束后取消其余后台任务。
-- 客户端断开时释放 Gemini 会话。
+- 支持在同一浏览器 WebSocket 上重复启动和停止云会话。
+- 每个云会话结束时发送一次结构化 `usage` 事件。
+- 默认每会话 token 预算为 50,000；达到预算后仅结束当前云会话。
+- 客户端断开或会话结束时释放 Gemini 会话。
 - 应用运行日志统一使用中文。
 
 ## 技术栈
@@ -100,7 +102,11 @@ WEBSOCKET_KEEPALIVE_SECONDS=20
 MAX_AUDIO_BYTES=262144
 MAX_VIDEO_BYTES=2097152
 MAX_TEXT_CHARS=2000
+SESSION_TOKEN_BUDGET=50000
 ```
+
+`SESSION_TOKEN_BUDGET` 必须为正数。默认 50,000 用于提供保守且便于演示的
+单会话保护；实际 token 以 Gemini Live 返回的 usage metadata 为准。
 
 ### 4. 启动服务
 

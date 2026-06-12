@@ -58,6 +58,7 @@ def test_invalid_local_env_does_not_break_test_collection(tmp_path):
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
         "SESSION_IDLE_SECONDS",
         "SESSION_MAX_SECONDS",
+        "SESSION_TOKEN_BUDGET",
     ):
         env.pop(env_name, None)
     backend_dir = os.path.dirname(os.path.dirname(__file__))
@@ -104,6 +105,7 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
         "SESSION_IDLE_SECONDS",
         "SESSION_MAX_SECONDS",
+        "SESSION_TOKEN_BUDGET",
     ):
         monkeypatch.delenv(env_name, raising=False)
 
@@ -118,6 +120,7 @@ def test_defaults_to_safe_realtime_media_limits(monkeypatch):
     assert settings.scheduler_shutdown_timeout_seconds == 1.0
     assert settings.session_idle_seconds == 45.0
     assert settings.session_max_seconds == 600.0
+    assert settings.session_token_budget == 50_000
 
 
 def test_parses_scheduler_queue_and_shutdown_environment(monkeypatch):
@@ -139,6 +142,7 @@ def test_env_example_documents_scheduler_limits():
     assert "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS=1.0" in env_example
     assert "SESSION_IDLE_SECONDS=45.0" in env_example
     assert "SESSION_MAX_SECONDS=600.0" in env_example
+    assert "SESSION_TOKEN_BUDGET=50000" in env_example
 
 
 def test_parses_session_lifecycle_environment(monkeypatch):
@@ -163,6 +167,7 @@ def test_parses_session_lifecycle_environment(monkeypatch):
         "SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS",
         "SESSION_IDLE_SECONDS",
         "SESSION_MAX_SECONDS",
+        "SESSION_TOKEN_BUDGET",
     ],
 )
 @pytest.mark.parametrize("value", [0, -1])

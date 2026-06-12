@@ -37,7 +37,7 @@ Protocol stages:
 | 1 | Released: bounded media validation |
 | 2 | Released: bounded fair scheduler semantics |
 | 3 | Released: explicit session lifecycle |
-| 5 | Planned: usage and budget events |
+| 5 | Released: usage and budget events |
 | 6 | Planned: interruption event |
 | 7 | Planned: GoAway and resumption events |
 
@@ -196,9 +196,70 @@ Terminal values:
 | `stopped` | User stop or Gemini response stream ended naturally | Stop media; allow restart |
 | `idle_timeout` | No validated and accepted input for 45 seconds by default | Stop media; allow restart |
 | `max_duration` | Session reached 600 seconds by default | Stop media; allow restart |
+| `budget_exceeded` | Gemini reported at least 50,000 total tokens by default | Stop media; allow restart |
 
 The backend keeps the browser WebSocket open after a terminal status. Idle
 time refreshes only after validated input is accepted by the scheduler.
+
+### Stage 5 Usage And Budget
+
+At protocol stage 5, every cloud session sends exactly one final `usage`
+event after its terminal `status`:
+
+```json
+{
+  "type":"usage",
+  "data":{
+    "audio_bytes":32000,
+    "text_chars":120,
+    "video_frames":8,
+    "video_replaced_frames":3,
+    "video_bytes":180000,
+    "input_tokens":1200,
+    "output_tokens":340,
+    "total_tokens":1540,
+    "duration_ms":25000,
+    "first_response_latency_ms":480
+  }
+}
+```
+
+Field meanings:
+
+- `audio_bytes`: audio bytes accepted by the input scheduler.
+- `text_chars`: text characters accepted by the input scheduler.
+- `video_frames`: video frames accepted by the latest-frame scheduler.
+- `video_replaced_frames`: accepted frames that replaced a pending frame
+  before cloud forwarding. Regressing or duplicate sequences are not accepted
+  and are not counted.
+- `video_bytes`: bytes across all accepted video frames, including frames
+  later replaced before forwarding.
+- `input_tokens`: sum of google-genai 2.8.0
+  `UsageMetadata.prompt_token_count` values reported during the session.
+- `output_tokens`: sum of google-genai 2.8.0
+  `UsageMetadata.response_token_count` values reported during the session.
+- `total_tokens`: sum of google-genai 2.8.0
+  `UsageMetadata.total_token_count` values reported during the session.
+- `duration_ms`: cloud-session duration measured by the backend.
+- `first_response_latency_ms`: delay from the first accepted input to the
+  first text or audio model output. It is `null` if either event never occurs.
+
+`SESSION_TOKEN_BUDGET` is a required-positive configuration with a default of
+50,000 tokens. The default is intentionally conservative enough for a
+demonstrable session guard; it is an operational limit, not a billing
+guarantee.
+
+When `total_tokens >= SESSION_TOKEN_BUDGET`, the backend stops accepting and
+sending input for that cloud session, closes the cloud session, then sends:
+
+```json
+{"type":"status","data":"budget_exceeded"}
+```
+
+The single final `usage` event follows that status. The browser WebSocket
+remains open and may send `start_session` again; counters reset for the new
+cloud session. The same status-then-usage ordering applies to `stopped`,
+`idle_timeout`, and `max_duration`.
 
 ### Server Error
 
@@ -279,50 +340,6 @@ GitHub merge state.
 ---
 
 ## Planned Protocol Evolution
-
-### Task 5: Usage And Budget
-
-Available only when the deployment reports protocol stage 5 or later.
-
-Target budget status:
-
-```json
-{"type":"status","data":"budget_exceeded"}
-```
-
-Target usage event:
-
-```json
-{
-  "type":"usage",
-  "data":{
-    "audio_bytes":32000,
-    "text_chars":120,
-    "video_frames":8,
-    "video_replaced_frames":3,
-    "video_bytes":180000,
-    "input_tokens":1200,
-    "output_tokens":340,
-    "total_tokens":1540,
-    "duration_ms":25000,
-    "first_response_latency_ms":480
-  }
-}
-```
-
-Field meanings:
-
-- `audio_bytes`: accepted client audio bytes.
-- `text_chars`: accepted client text characters.
-- `video_frames`: accepted client video frames.
-- `video_replaced_frames`: pending frames replaced before cloud forwarding.
-- `video_bytes`: accepted client video bytes.
-- `input_tokens`, `output_tokens`, `total_tokens`: Gemini usage metadata.
-- `duration_ms`: cloud-session duration.
-- `first_response_latency_ms`: delay from the first accepted input to the
-  first model output.
-
-The backend is the source of truth for limit enforcement.
 
 ### Task 6: Interruption
 

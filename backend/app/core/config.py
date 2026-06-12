@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     scheduler_shutdown_timeout_seconds: PositiveFloat = 1.0
     session_idle_seconds: PositiveFloat = 45.0
     session_max_seconds: PositiveFloat = 600.0
+    session_token_budget: PositiveInt = 50_000
 
     model_config = SettingsConfigDict(
         env_file=".env",
