@@ -60,4 +60,38 @@ describe("App", () => {
     expect(await screen.findByText("检查摄像头与麦克风")).toBeInTheDocument();
     expect(getUserMedia).toHaveBeenCalledTimes(1);
   });
+
+  it("确认设备后启动会话并在 connected 前不发送媒体", async () => {
+    const stream = {
+      getTracks: () => [],
+      getAudioTracks: () => [{ enabled: true }],
+      getVideoTracks: () => [{ enabled: true }],
+    } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    const enumerateDevices = vi.fn().mockResolvedValue([
+      { deviceId: "cam-1", kind: "videoinput", label: "前置摄像头" },
+      { deviceId: "mic-1", kind: "audioinput", label: "内置麦克风" },
+    ]);
+    const start = vi.fn();
+    const createOrchestrator = vi.fn(() => ({
+      start,
+      sendText: vi.fn(),
+      setMuted: vi.fn(),
+      setVideoPaused: vi.fn(),
+      stop: vi.fn(),
+      destroy: vi.fn(),
+    }));
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia, enumerateDevices },
+    });
+
+    render(<App createOrchestrator={createOrchestrator} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "开始视觉对话" }));
+    fireEvent.click(await screen.findByRole("button", { name: "开始会话" }));
+
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("正在连接")).toBeInTheDocument();
+  });
 });
