@@ -24,24 +24,38 @@ def encode(data: bytes) -> str:
 
 
 @pytest.mark.parametrize(
-    "raw_message",
+    "parser_error",
     [
-        pytest.param(
-            '{"type":' + "9" * 5_000 + "}",
-            id="integer-exceeds-conversion-limit",
-        ),
-        pytest.param(
-            '{"type":' + "[" * 2_000 + "0" + "]" * 2_000 + "}",
-            id="excessive-nesting",
-        ),
+        pytest.param(ValueError("invalid JSON"), id="value-error"),
+        pytest.param(RecursionError("too deeply nested"), id="recursion-error"),
     ],
 )
 def test_wraps_json_parser_failures_as_chinese_client_errors(
     settings,
-    raw_message,
+    monkeypatch,
+    parser_error,
 ):
+    def fail_to_load(_raw_message):
+        raise parser_error
+
+    monkeypatch.setattr(messages.json, "loads", fail_to_load)
+
     with pytest.raises(ClientMessageError, match="消息不是有效的 JSON"):
-        parse_client_message(raw_message, settings)
+        parse_client_message("invalid", settings)
+
+
+def test_does_not_wrap_unexpected_json_parser_failures(settings, monkeypatch):
+    parser_error = RuntimeError("unexpected parser failure")
+
+    def fail_to_load(_raw_message):
+        raise parser_error
+
+    monkeypatch.setattr(messages.json, "loads", fail_to_load)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        parse_client_message("invalid", settings)
+
+    assert exc_info.value is parser_error
 
 
 def test_parses_audio_bytes(settings):
