@@ -342,26 +342,23 @@ git commit -m "feat: enforce realtime session lifecycle"
 
 ### Task 4: Add Cost-Safe Gemini Live Configuration
 
-**PR title:** `feat: configure low-cost Gemini Live defaults`
+**PR title:** `Task4：配置 Gemini Live 成本安全默认值`
 
 **Files:**
 - Modify: `backend/app/services/gemini_service.py`
-- Modify: `backend/app/core/config.py`
-- Modify: `backend/.env.example`
 - Modify: `backend/tests/test_gemini_service.py`
-- Modify: `backend/tests/test_config.py`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
-- [ ] **Step 1: Write failing configuration tests**
+- [x] **Step 1: Write focused failing configuration tests**
 
 Cover:
 
 ```python
-def test_build_live_config_uses_low_media_resolution(): ...
-def test_build_live_config_enables_sliding_window_compression(): ...
-def test_live_cost_settings_have_validated_defaults(): ...
+def test_build_live_config_uses_cost_safe_live_defaults(): ...
+def test_connect_uses_live_config_builder(): ...
 ```
 
-- [ ] **Step 2: Implement one pure config builder**
+- [x] **Step 2: Implement one pure config builder**
 
 Create `build_live_config(settings)` and set:
 
@@ -369,20 +366,28 @@ Create `build_live_config(settings)` and set:
 - configured voice;
 - low media resolution;
 - sliding-window context compression;
-- existing Chinese system instruction.
+- existing Chinese system instruction;
+- existing input/output transcription and automatic activity detection.
 
 Keep Google AI Studio API-key authentication only. Do not add Vertex AI settings.
+The installed `google-genai` 2.x types make compression token thresholds
+optional, so this task does not add speculative environment settings or change
+`backend/.env.example`.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 ```bash
+(cd backend && uv run pytest -q tests/test_gemini_service.py)
 (cd backend && uv run pytest -q)
 (cd backend && uv run python -m compileall -q app tests)
-git add backend/app/services/gemini_service.py backend/app/core/config.py \
-  backend/.env.example backend/tests/test_gemini_service.py \
-  backend/tests/test_config.py
-git commit -m "feat: configure cost safe Gemini Live defaults"
+git add backend/app/services/gemini_service.py \
+  backend/tests/test_gemini_service.py \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
+git commit -m "Task4：配置 Gemini Live 成本安全默认值"
 ```
+
+This task does not change the WebSocket wire protocol, so
+`docs/frontend-integration-contract.md` requires no update.
 
 ---
 
