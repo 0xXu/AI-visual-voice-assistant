@@ -11,8 +11,6 @@ from app.core.config import Settings
 MessageType = Literal[
     "ping",
     "pong",
-    "start_session",
-    "stop_session",
     "audio",
     "video_frame",
     "text",
@@ -46,7 +44,7 @@ def parse_client_message(
         raise ClientMessageError("消息必须是 JSON 对象")
 
     message_type = payload.get("type")
-    if message_type in {"ping", "pong", "start_session", "stop_session"}:
+    if message_type in {"ping", "pong"}:
         return ClientMessage(type=message_type)
 
     if message_type == "text":

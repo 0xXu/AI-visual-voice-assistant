@@ -33,8 +33,8 @@ Protocol stages:
 
 | Stage | Available behavior |
 |---:|---|
-| 0 | Released Protocol in this document |
-| 1 | Task 1 bounded media protocol |
+| 0 | Legacy protocol before bounded media |
+| 1 | Released Protocol in this document: bounded media validation |
 | 2 | Task 2 bounded scheduler semantics |
 | 3 | Task 3 explicit session lifecycle |
 | 5 | Task 5 usage and budget events |
@@ -110,26 +110,32 @@ Requirements:
 Requirements:
 
 - PCM signed 16-bit little-endian, mono, 16 kHz.
-- Maximum decoded size is 262,144 bytes by default.
-- The current parser validates Base64 and size, but does not yet validate an
-  even PCM16 byte count.
+- `data` must be strict Base64.
+- Maximum decoded size is 8,192 bytes by default.
+- The decoded PCM16 byte count must be even.
 
-Recommended frontend chunk duration is 20–40 ms even though the current
-backend accepts larger payloads.
+Recommended frontend chunk duration is 20–40 ms.
 
 ### Client Video Frame
 
 ```json
-{"type":"video_frame","data":"<base64-jpeg>"}
+{
+  "type":"video_frame",
+  "data":"<base64-jpeg>",
+  "timestamp":1781234567890,
+  "sequence":42
+}
 ```
 
 Requirements:
 
-- Send a complete JPEG image because the backend forwards it to Gemini as
-  `image/jpeg`.
-- Maximum decoded size is 2,097,152 bytes by default.
-- The current parser validates Base64 and size, but does not yet validate JPEG
-  markers, timestamps, or sequence numbers.
+- `data` must be strict Base64 containing a complete JPEG image with JPEG
+  start and end markers.
+- Maximum decoded size is 524,288 bytes by default.
+- `timestamp` must be an integer Unix epoch timestamp in milliseconds.
+- `sequence` must be an integer.
+- `timestamp` may differ from backend time by at most 2,000 ms in either
+  direction by default.
 
 ### Server Connected Status
 
@@ -182,34 +188,25 @@ little-endian, mono PCM at 24 kHz.
 The current model response turn has finished. The frontend may use this event
 to finalize transcript or playback UI state.
 
+## Stage 0 Compatibility
+
+Deployments reporting protocol stage 0 use the pre-bounded-media contract:
+
+- Audio allows up to 262,144 decoded bytes and does not enforce an even PCM16
+  byte count.
+- Video allows up to 2,097,152 decoded bytes and does not require JPEG
+  markers, `timestamp`, or `sequence`.
+- `start_session` and `stop_session` do not exist.
+- Gemini Live is still created immediately and closing the live session still
+  closes the browser WebSocket.
+
+The frontend must select behavior from the deployment's `protocol_stage`.
+Do not infer deployed capability from this repository's current branch or
+GitHub merge state.
+
 ---
 
 ## Planned Protocol Evolution
-
-### Task 1: Bounded Media Protocol
-
-Available only when the deployment reports protocol stage 1 or later.
-
-Changes:
-
-- Audio maximum becomes 8,192 decoded bytes by default.
-- PCM16 audio must have an even decoded byte count.
-- Video maximum becomes 524,288 decoded bytes by default.
-- Video must contain JPEG start and end markers.
-- Video messages require Unix epoch `timestamp` in milliseconds and an
-  increasing integer `sequence`.
-- Timestamp skew is limited to 2,000 ms in either direction by default.
-
-Target video message:
-
-```json
-{
-  "type":"video_frame",
-  "data":"<base64-jpeg>",
-  "timestamp":1781234567890,
-  "sequence":42
-}
-```
 
 ### Task 2: Bounded Scheduler
 

@@ -34,13 +34,9 @@ def test_parses_audio_bytes(settings):
 
 
 @pytest.mark.parametrize("message_type", ["start_session", "stop_session"])
-def test_parses_lifecycle_messages_without_data(settings, message_type):
-    message = parse_client_message(json.dumps({"type": message_type}), settings)
-
-    assert message.type == message_type
-    assert message.data is None
-    assert message.timestamp_ms is None
-    assert message.sequence is None
+def test_rejects_unreleased_lifecycle_messages(settings, message_type):
+    with pytest.raises(ClientMessageError, match="不支持"):
+        parse_client_message(json.dumps({"type": message_type}), settings)
 
 
 def test_rejects_odd_length_pcm16_audio(settings):
@@ -154,6 +150,23 @@ def test_rejects_stale_video_frame(settings):
             settings,
             now_ms=10_000,
         )
+
+
+def test_allows_video_frame_at_past_clock_skew_boundary(settings):
+    message = parse_client_message(
+        json.dumps(
+            {
+                "type": "video_frame",
+                "data": encode(b"\xff\xd8frame\xff\xd9"),
+                "timestamp": 8_000,
+                "sequence": 1,
+            }
+        ),
+        settings,
+        now_ms=10_000,
+    )
+
+    assert message.timestamp_ms == 8_000
 
 
 def test_rejects_video_frame_beyond_future_clock_skew(settings):
