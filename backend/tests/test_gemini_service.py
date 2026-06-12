@@ -39,7 +39,9 @@ def test_creates_ai_studio_client_with_api_key(monkeypatch):
         return object()
 
     monkeypatch.setattr(gemini_service.genai, "Client", fake_client)
-    service = GeminiLiveService(Settings(gemini_api_key="test-key"))
+    service = GeminiLiveService(
+        Settings(gemini_api_key="test-key", _env_file=None)
+    )
 
     service._create_client()
 

@@ -16,6 +16,7 @@ def settings():
         max_video_bytes=16,
         max_frame_age_ms=2_000,
         max_text_chars=10,
+        _env_file=None,
     )
 
 
