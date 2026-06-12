@@ -176,11 +176,36 @@ def test_maps_live_server_usage_metadata_with_sdk_type():
     ]
 
 
+def test_maps_input_audio_transcription_to_user_text():
+    message = types.LiveServerMessage(
+        server_content=types.LiveServerContent(
+            input_transcription=types.Transcription(text="用户说的话"),
+        )
+    )
+
+    class ReceivingSession:
+        async def receive(self):
+            yield message
+
+    async def collect():
+        return [
+            event
+            async for event in GeminiSession(ReceivingSession()).receive()
+        ]
+
+    assert asyncio.run(collect()) == [
+        GeminiResponse(
+            payload={"type": "user_text", "data": "用户说的话"}
+        )
+    ]
+
+
 def test_interruption_precedes_same_message_outputs_and_is_emitted_once():
     metadata = types.UsageMetadata(total_token_count=1)
     message = types.LiveServerMessage(
         server_content=types.LiveServerContent(
             interrupted=True,
+            input_transcription=types.Transcription(text="用户打断内容"),
             output_transcription=types.Transcription(text="取消前文本"),
             model_turn=types.Content(
                 parts=[
@@ -210,6 +235,9 @@ def test_interruption_precedes_same_message_outputs_and_is_emitted_once():
     assert asyncio.run(collect()) == [
         GeminiResponse(payload={"type": "interrupted", "data": ""}),
         GeminiResponse(usage_metadata=metadata),
+        GeminiResponse(
+            payload={"type": "user_text", "data": "用户打断内容"}
+        ),
         GeminiResponse(
             payload={"type": "text", "data": "取消前文本"},
             model_output=True,
