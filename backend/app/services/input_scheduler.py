@@ -19,6 +19,7 @@ class InputScheduler:
         self._audio: asyncio.Queue[bytes] = asyncio.Queue(audio_capacity)
         self._text: asyncio.Queue[str] = asyncio.Queue()
         self._latest_video: PendingVideo | None = None
+        self._highest_seen_video_sequence: int | None = None
         self._wake = asyncio.Event()
         self._closed = False
 
@@ -32,9 +33,10 @@ class InputScheduler:
 
     def submit_video(self, data: bytes, sequence: int) -> None:
         if (
-            self._latest_video is None
-            or sequence > self._latest_video.sequence
+            self._highest_seen_video_sequence is None
+            or sequence > self._highest_seen_video_sequence
         ):
+            self._highest_seen_video_sequence = sequence
             self._latest_video = PendingVideo(data, sequence)
             self._wake.set()
 

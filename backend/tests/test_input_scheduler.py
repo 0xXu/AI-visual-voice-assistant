@@ -43,6 +43,17 @@ def test_older_video_frame_cannot_replace_newer_pending_frame():
     assert scheduler.take_latest_video() == (b"new", 2)
 
 
+def test_older_video_frame_is_rejected_after_newer_frame_is_consumed():
+    scheduler = InputScheduler(audio_capacity=4)
+
+    scheduler.submit_video(b"new", sequence=10)
+    assert scheduler.take_latest_video() == (b"new", 10)
+
+    scheduler.submit_video(b"old", sequence=9)
+
+    assert scheduler.take_latest_video() is None
+
+
 def test_text_and_audio_are_sent_before_pending_video():
     async def scenario():
         scheduler = InputScheduler(audio_capacity=4)
