@@ -150,7 +150,10 @@ git commit -m "docs: define backend frontend boundary"
 - Modify: `backend/.env.example`
 - Modify: `backend/tests/test_messages.py`
 - Modify: `backend/tests/test_config.py`
+- Modify: `backend/tests/test_websocket.py`
+- Create: `backend/tests/conftest.py`
 - Modify: `docs/frontend-integration-contract.md`
+- Modify: `docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md`
 
 - [ ] **Step 1: Write failing protocol tests**
 
@@ -159,7 +162,7 @@ Cover:
 ```python
 def test_rejects_oversized_audio_before_decode(settings): ...
 def test_rejects_odd_length_pcm16(settings): ...
-def test_rejects_non_jpeg_video(settings): ...
+def test_rejects_video_without_jpeg_soi_eoi_markers(settings): ...
 def test_rejects_stale_and_future_video_timestamps(settings): ...
 def test_parses_bounded_text_messages(settings): ...
 ```
@@ -179,7 +182,8 @@ Requirements:
 - Decode Base64 with strict validation.
 - Reject encoded payloads that cannot fit the configured decoded limit before allocating decoded bytes.
 - Require PCM16 audio to contain an even byte count.
-- Require JPEG start/end markers.
+- Require a JPEG marker envelope: SOI at the start and EOI at the end.
+- Do not claim or perform complete JPEG decoding or structural validation.
 - Require integer `timestamp` and `sequence`.
 - Reject frames older or further in the future than `MAX_FRAME_AGE_MS`.
 - Return Chinese client-facing errors.
@@ -191,7 +195,9 @@ Requirements:
 (cd backend && uv run python -m compileall -q app tests)
 git add backend/app/api/messages.py backend/app/core/config.py \
   backend/.env.example backend/tests/test_messages.py backend/tests/test_config.py \
-  docs/frontend-integration-contract.md
+  backend/tests/test_websocket.py backend/tests/conftest.py \
+  docs/frontend-integration-contract.md \
+  docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md
 git commit -m "feat: add bounded realtime media protocol"
 ```
 

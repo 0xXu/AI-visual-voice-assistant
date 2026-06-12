@@ -1,13 +1,26 @@
 import base64
 import binascii
 import json
+import re
+import time
 from dataclasses import dataclass
 from typing import Literal
 
 from app.core.config import Settings
 
 
-MessageType = Literal["ping", "pong", "audio", "video_frame", "text"]
+_BASE64_PATTERN = re.compile(
+    r"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"
+)
+
+
+MessageType = Literal[
+    "ping",
+    "pong",
+    "audio",
+    "video_frame",
+    "text",
+]
 
 
 class ClientMessageError(ValueError):
@@ -18,12 +31,19 @@ class ClientMessageError(ValueError):
 class ClientMessage:
     type: MessageType
     data: bytes | str | None = None
+    timestamp_ms: int | None = None
+    sequence: int | None = None
 
 
-def parse_client_message(raw_message: str, settings: Settings) -> ClientMessage:
+def parse_client_message(
+    raw_message: str,
+    settings: Settings,
+    *,
+    now_ms: int | None = None,
+) -> ClientMessage:
     try:
         payload = json.loads(raw_message)
-    except json.JSONDecodeError as exc:
+    except (ValueError, RecursionError) as exc:
         raise ClientMessageError("消息不是有效的 JSON") from exc
 
     if not isinstance(payload, dict):
@@ -42,13 +62,14 @@ def parse_client_message(raw_message: str, settings: Settings) -> ClientMessage:
     if message_type == "audio":
         return ClientMessage(
             type="audio",
-            data=_parse_base64(payload.get("data"), settings.max_audio_bytes),
+            data=_parse_audio(payload.get("data"), settings.max_audio_bytes),
         )
 
     if message_type == "video_frame":
-        return ClientMessage(
-            type="video_frame",
-            data=_parse_base64(payload.get("data"), settings.max_video_bytes),
+        return _parse_video_frame(
+            payload,
+            settings,
+            now_ms=time.time_ns() // 1_000_000 if now_ms is None else now_ms,
         )
 
     raise ClientMessageError(f"不支持的消息类型：{message_type!r}")
@@ -65,6 +86,13 @@ def _parse_text(value: object, max_chars: int) -> str:
 def _parse_base64(value: object, max_bytes: int) -> bytes:
     if not isinstance(value, str) or not value:
         raise ClientMessageError("媒体内容不能为空")
+    if _BASE64_PATTERN.fullmatch(value) is None:
+        raise ClientMessageError("媒体内容不是有效的 Base64 数据")
+
+    padding = len(value) - len(value.rstrip("="))
+    candidate_bytes = (len(value) // 4) * 3 - padding
+    if candidate_bytes > max_bytes:
+        raise ClientMessageError(f"媒体内容过大，最多允许 {max_bytes} 字节")
 
     try:
         decoded = base64.b64decode(value, validate=True)
@@ -74,3 +102,42 @@ def _parse_base64(value: object, max_bytes: int) -> bytes:
     if len(decoded) > max_bytes:
         raise ClientMessageError(f"媒体内容过大，最多允许 {max_bytes} 字节")
     return decoded
+
+
+def _parse_audio(value: object, max_bytes: int) -> bytes:
+    decoded = _parse_base64(value, max_bytes)
+    if len(decoded) % 2:
+        raise ClientMessageError("PCM16 音频必须包含偶数字节")
+    return decoded
+
+
+def _parse_video_frame(
+    payload: dict[str, object],
+    settings: Settings,
+    *,
+    now_ms: int,
+) -> ClientMessage:
+    decoded = _parse_base64(payload.get("data"), settings.max_video_bytes)
+    if not decoded.startswith(b"\xff\xd8") or not decoded.endswith(b"\xff\xd9"):
+        raise ClientMessageError("视频帧必须包含 JPEG SOI/EOI 起止标记")
+
+    timestamp_ms = _parse_integer(payload.get("timestamp"), "timestamp")
+    sequence = _parse_integer(payload.get("sequence"), "sequence")
+    age_ms = now_ms - timestamp_ms
+    if age_ms > settings.max_frame_age_ms:
+        raise ClientMessageError("视频帧已过期")
+    if age_ms < -settings.max_frame_age_ms:
+        raise ClientMessageError("视频帧时间戳过于超前")
+
+    return ClientMessage(
+        type="video_frame",
+        data=decoded,
+        timestamp_ms=timestamp_ms,
+        sequence=sequence,
+    )
+
+
+def _parse_integer(value: object, field_name: str) -> int:
+    if type(value) is not int:
+        raise ClientMessageError(f"{field_name} 必须是整数")
+    return value

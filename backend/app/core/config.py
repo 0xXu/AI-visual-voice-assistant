@@ -1,4 +1,4 @@
-from pydantic import SecretStr
+from pydantic import PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,9 +13,10 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
     websocket_keepalive_seconds: float = 20.0
-    max_audio_bytes: int = 256 * 1024
-    max_video_bytes: int = 2 * 1024 * 1024
-    max_text_chars: int = 2_000
+    max_audio_bytes: PositiveInt = 8_192
+    max_video_bytes: PositiveInt = 524_288
+    max_frame_age_ms: PositiveInt = 2_000
+    max_text_chars: PositiveInt = 2_000
 
     model_config = SettingsConfigDict(
         env_file=".env",
