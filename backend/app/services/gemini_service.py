@@ -122,11 +122,16 @@ class GeminiSession:
     async def receive(self) -> AsyncIterator[GeminiResponse]:
         try:
             async for response in self.session.receive():
+                server_content = getattr(response, "server_content", None)
+                if server_content and server_content.interrupted:
+                    yield GeminiResponse(
+                        payload={"type": "interrupted", "data": ""}
+                    )
+
                 usage_metadata = response.usage_metadata
                 if usage_metadata is not None:
                     yield GeminiResponse(usage_metadata=usage_metadata)
 
-                server_content = getattr(response, "server_content", None)
                 if not server_content:
                     continue
 
