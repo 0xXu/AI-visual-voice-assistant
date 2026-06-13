@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="760" viewBox="0 0 1440 760" role="img" aria-labelledby="title desc">
+  <title id="title">AI 视觉语音助手系统架构</title>
+  <desc id="desc">浏览器、FastAPI 后端与 Gemini Live 之间的双向实时数据流，以及会话和成本保护机制。</desc>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020812"/>
+      <stop offset="55%" stop-color="#061624"/>
+      <stop offset="100%" stop-color="#0a1024"/>
+    </linearGradient>
+    <linearGradient id="browserCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b2637"/>
+      <stop offset="100%" stop-color="#0a1b2b"/>
+    </linearGradient>
+    <linearGradient id="backendCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#102c3d"/>
+      <stop offset="100%" stop-color="#0a1a29"/>
+    </linearGradient>
+    <linearGradient id="geminiCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#292250"/>
+      <stop offset="100%" stop-color="#151a3b"/>
+    </linearGradient>
+    <linearGradient id="guardrail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0b2b2c"/>
+      <stop offset="50%" stop-color="#102d35"/>
+      <stop offset="100%" stop-color="#1f2446"/>
+    </linearGradient>
+    <style>
+      text { font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; }
+      .title { font-size: 34px; font-weight: 700; fill: #effbff; letter-spacing: -0.5px; }
+      .subtitle { font-size: 15px; font-weight: 400; fill: #91adbd; }
+      .card-title { font-size: 22px; font-weight: 700; fill: #effbff; }
+      .card-kicker { font-size: 11px; font-weight: 700; fill: #70ddff; letter-spacing: 1.8px; }
+      .item { font-size: 14px; font-weight: 600; fill: #c8dce5; }
+      .item-muted { font-size: 12px; font-weight: 400; fill: #91adbd; }
+      .flow-label { font-size: 12px; font-weight: 600; fill: #d8f7ff; }
+      .flow-detail { font-size: 11px; font-weight: 400; fill: #91adbd; }
+      .guard-title { font-size: 15px; font-weight: 700; fill: #effbff; }
+      .guard-text { font-size: 12px; font-weight: 600; fill: #b8d0dc; }
+      .badge { font-size: 10px; font-weight: 700; fill: #071522; letter-spacing: 0.6px; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="760" rx="28" fill="url(#background)"/>
+  <circle cx="154" cy="90" r="180" fill="#0b6c8d" opacity="0.08"/>
+  <circle cx="1290" cy="125" r="210" fill="#795fd2" opacity="0.09"/>
+
+  <text x="72" y="70" class="title">实时多模态系统架构</text>
+  <text x="72" y="99" class="subtitle">摄像头、语音和文字共享一个受控的 Gemini Live 会话。</text>
+
+  <g>
+    <rect x="70" y="150" width="360" height="375" rx="24" fill="url(#browserCard)" stroke="#2e6e88" stroke-width="1.5"/>
+    <rect x="540" y="150" width="360" height="375" rx="24" fill="url(#backendCard)" stroke="#3b8296" stroke-width="1.5"/>
+    <rect x="1010" y="150" width="360" height="375" rx="24" fill="url(#geminiCard)" stroke="#7964b4" stroke-width="1.5"/>
+  </g>
+
+  <!-- Browser -->
+  <text x="102" y="190" class="card-kicker">客户端</text>
+  <text x="102" y="225" class="card-title">浏览器</text>
+  <rect x="332" y="178" width="66" height="24" rx="12" fill="#70ddff"/>
+  <text x="365" y="194" text-anchor="middle" class="badge">REACT</text>
+
+  <g transform="translate(102 257)">
+    <circle cx="8" cy="1" r="5" fill="#70ddff"/>
+    <text x="25" y="6" class="item">React UI + 会话状态管理</text>
+    <text x="25" y="26" class="item-muted">设备检测 · 实时会话 · 结果摘要</text>
+
+    <circle cx="8" cy="66" r="5" fill="#70ddff"/>
+    <text x="25" y="71" class="item">AudioWorklet 音频采集</text>
+    <text x="25" y="91" class="item-muted">单声道 PCM16 · 16 kHz · 40 ms 分块</text>
+
+    <circle cx="8" cy="131" r="5" fill="#70ddff"/>
+    <text x="25" y="136" class="item">Canvas 视频抽帧</text>
+    <text x="25" y="156" class="item-muted">JPEG · 约 1 fps · 最长边 960 px</text>
+
+    <circle cx="8" cy="196" r="5" fill="#70ddff"/>
+    <text x="25" y="201" class="item">WebSocket + PCM 播放器</text>
+    <text x="25" y="221" class="item-muted">断线重连 · 播放队列 · 用户打断</text>
+  </g>
+
+  <!-- Backend -->
+  <text x="572" y="190" class="card-kicker">控制层</text>
+  <text x="572" y="225" class="card-title">FastAPI 后端</text>
+  <rect x="794" y="178" width="74" height="24" rx="12" fill="#65e6bf"/>
+  <text x="831" y="194" text-anchor="middle" class="badge">PYTHON</text>
+
+  <g transform="translate(572 257)">
+    <circle cx="8" cy="1" r="5" fill="#65e6bf"/>
+    <text x="25" y="6" class="item">协议与媒体校验</text>
+    <text x="25" y="26" class="item-muted">Base64 · PCM16 · JPEG · 时间戳</text>
+
+    <circle cx="8" cy="66" r="5" fill="#65e6bf"/>
+    <text x="25" y="71" class="item">有界输入调度器</text>
+    <text x="25" y="91" class="item-muted">公平调度音频/文字 · 仅保留最新画面</text>
+
+    <circle cx="8" cy="131" r="5" fill="#65e6bf"/>
+    <text x="25" y="136" class="item">会话运行时与恢复</text>
+    <text x="25" y="156" class="item-muted">超时 · GoAway · 会话恢复</text>
+
+    <circle cx="8" cy="196" r="5" fill="#65e6bf"/>
+    <text x="25" y="201" class="item">用量统计</text>
+    <text x="25" y="221" class="item-muted">媒体 · token · 延迟 · 预算</text>
+  </g>
+
+  <!-- Gemini -->
+  <text x="1042" y="190" class="card-kicker">AI 运行时</text>
+  <text x="1042" y="225" class="card-title">Gemini Live</text>
+  <rect x="1270" y="178" width="68" height="24" rx="12" fill="#a993ff"/>
+  <text x="1304" y="194" text-anchor="middle" class="badge">LIVE</text>
+
+  <g transform="translate(1042 257)">
+    <circle cx="8" cy="1" r="5" fill="#a993ff"/>
+    <text x="25" y="6" class="item">多模态理解</text>
+    <text x="25" y="26" class="item-muted">视觉 · 语音 · 文字 · 上下文</text>
+
+    <circle cx="8" cy="66" r="5" fill="#a993ff"/>
+    <text x="25" y="71" class="item">流式语音回答</text>
+    <text x="25" y="91" class="item-muted">PCM16 音频 · 24 kHz</text>
+
+    <circle cx="8" cy="131" r="5" fill="#a993ff"/>
+    <text x="25" y="136" class="item">输入与输出转写</text>
+    <text x="25" y="156" class="item-muted">用户文字 · 模型文字 · 轮次事件</text>
+
+    <circle cx="8" cy="196" r="5" fill="#a993ff"/>
+    <text x="25" y="201" class="item">成本安全配置</text>
+    <text x="25" y="221" class="item-muted">LOW 媒体分辨率 · 上下文压缩</text>
+  </g>
+
+  <!-- Browser / Backend flows -->
+  <line x1="430" y1="262" x2="522" y2="262" stroke="#70ddff" stroke-width="3"/>
+  <polygon points="530,262 518,255 518,269" fill="#70ddff"/>
+  <rect x="438" y="216" width="94" height="34" rx="10" fill="#071522" stroke="#214c60"/>
+  <text x="485" y="230" text-anchor="middle" class="flow-label">WebSocket</text>
+  <text x="485" y="244" text-anchor="middle" class="flow-detail">JSON + Base64</text>
+  <text x="480" y="285" text-anchor="middle" class="flow-detail">输入媒体</text>
+
+  <line x1="540" y1="392" x2="448" y2="392" stroke="#65e6bf" stroke-width="3"/>
+  <polygon points="440,392 452,385 452,399" fill="#65e6bf"/>
+  <text x="487" y="417" text-anchor="middle" class="flow-detail">输出事件</text>
+
+  <!-- Backend / Gemini flows -->
+  <line x1="900" y1="262" x2="992" y2="262" stroke="#70ddff" stroke-width="3"/>
+  <polygon points="1000,262 988,255 988,269" fill="#70ddff"/>
+  <rect x="909" y="216" width="84" height="34" rx="10" fill="#0c142c" stroke="#4d427b"/>
+  <text x="951" y="230" text-anchor="middle" class="flow-label">GenAI SDK</text>
+  <text x="951" y="244" text-anchor="middle" class="flow-detail">实时会话</text>
+  <text x="950" y="285" text-anchor="middle" class="flow-detail">实时输入</text>
+
+  <line x1="1010" y1="392" x2="918" y2="392" stroke="#65e6bf" stroke-width="3"/>
+  <polygon points="910,392 922,385 922,399" fill="#65e6bf"/>
+  <text x="957" y="417" text-anchor="middle" class="flow-detail">实时输出</text>
+
+  <!-- Guardrails -->
+  <rect x="70" y="577" width="1300" height="120" rx="22" fill="url(#guardrail)" stroke="#376c79" stroke-width="1.2"/>
+  <text x="102" y="612" class="guard-title">会话与成本保护</text>
+
+  <g transform="translate(102 641)">
+    <rect width="224" height="34" rx="17" fill="#0a2027" stroke="#36707a"/>
+    <text x="112" y="22" text-anchor="middle" class="guard-text">仅保留最新画面</text>
+
+    <rect x="242" width="224" height="34" rx="17" fill="#0a2027" stroke="#36707a"/>
+    <text x="354" y="22" text-anchor="middle" class="guard-text">有界输入队列</text>
+
+    <rect x="484" width="224" height="34" rx="17" fill="#0a2027" stroke="#36707a"/>
+    <text x="596" y="22" text-anchor="middle" class="guard-text">45 秒空闲超时</text>
+
+    <rect x="726" width="224" height="34" rx="17" fill="#101f35" stroke="#53528a"/>
+    <text x="838" y="22" text-anchor="middle" class="guard-text">600 秒最长时限</text>
+
+    <rect x="968" width="268" height="34" rx="17" fill="#151f3a" stroke="#66579c"/>
+    <text x="1102" y="22" text-anchor="middle" class="guard-text">50,000 token 预算与用量</text>
+  </g>
+
+  <text x="1368" y="730" text-anchor="end" class="flow-detail">API Key 仅保存在后端</text>
+</svg>
