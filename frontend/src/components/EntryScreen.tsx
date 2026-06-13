@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ArrowRight, Camera, Mic } from "lucide-react";
 
 interface EntryScreenProps {
@@ -5,11 +6,67 @@ interface EntryScreenProps {
 }
 
 export function EntryScreen({ onStart }: EntryScreenProps) {
+  const stageRef = useRef<HTMLElement | null>(null);
+  const pointerFramePending = useRef(false);
+  const pendingPointer = useRef({ x: 50, y: 50 });
+
+  const updatePointer = (x: number, y: number) => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return;
+    }
+
+    stage.style.setProperty("--entry-pointer-x", `${x}%`);
+    stage.style.setProperty("--entry-pointer-y", `${y}%`);
+    stage.style.setProperty("--entry-shift-x", `${(x - 50) * 0.12}px`);
+    stage.style.setProperty("--entry-shift-y", `${(y - 50) * 0.08}px`);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    if (
+      !window.matchMedia("(pointer: fine)").matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    pendingPointer.current = {
+      x: Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100)),
+      y: Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100)),
+    };
+
+    if (pointerFramePending.current) {
+      return;
+    }
+
+    pointerFramePending.current = true;
+    window.requestAnimationFrame(() => {
+      pointerFramePending.current = false;
+      updatePointer(pendingPointer.current.x, pendingPointer.current.y);
+    });
+  };
+
   return (
-    <main className="entry-screen screen-enter">
+    <main
+      ref={stageRef}
+      className="entry-screen screen-enter"
+      style={
+        {
+          "--entry-pointer-x": "50%",
+          "--entry-pointer-y": "50%",
+          "--entry-shift-x": "0px",
+          "--entry-shift-y": "0px",
+        } as React.CSSProperties
+      }
+      onPointerMove={handlePointerMove}
+      onPointerLeave={() => updatePointer(50, 50)}
+    >
       <div className="atmosphere atmosphere--primary" aria-hidden="true" />
       <div className="atmosphere atmosphere--secondary" aria-hidden="true" />
       <div className="entry-grid" aria-hidden="true" />
+      <div className="entry-stage__beam" aria-hidden="true" />
+      <div className="entry-stage__grain" aria-hidden="true" />
 
       <header className="entry-header">
         <a className="brand-mark" href="/" aria-label="EchoSight 首页">
@@ -31,8 +88,8 @@ export function EntryScreen({ onStart }: EntryScreenProps) {
         </p>
 
         <h1 id="entry-title">
-          让 AI
-          <span>看见你所看见的</span>
+          <span className="entry-title__line">让 AI</span>
+          <span className="entry-title__accent">看见你所看见的</span>
         </h1>
 
         <p className="entry-description">
@@ -60,16 +117,28 @@ export function EntryScreen({ onStart }: EntryScreenProps) {
       <aside className="entry-orbit" aria-hidden="true">
         <div className="entry-orbit__ring entry-orbit__ring--outer" />
         <div className="entry-orbit__ring entry-orbit__ring--inner" />
+        <div className="entry-orbit__ticks" />
+        <div className="entry-orbit__scan" />
         <div className="entry-orbit__core">
           <span />
         </div>
-        <div className="entry-orbit__label entry-orbit__label--vision">
-          <Camera size={15} />
-          视觉理解
+        <div className="entry-orbit__carrier entry-orbit__carrier--vision">
+          <div className="entry-orbit__satellite-anchor">
+            <span className="entry-orbit__node" />
+            <div className="entry-orbit__satellite">
+              <Camera size={15} />
+              <span>视觉理解</span>
+            </div>
+          </div>
         </div>
-        <div className="entry-orbit__label entry-orbit__label--voice">
-          <Mic size={15} />
-          自然语音
+        <div className="entry-orbit__carrier entry-orbit__carrier--voice">
+          <div className="entry-orbit__satellite-anchor">
+            <span className="entry-orbit__node" />
+            <div className="entry-orbit__satellite">
+              <Mic size={15} />
+              <span>自然语音</span>
+            </div>
+          </div>
         </div>
       </aside>
 
