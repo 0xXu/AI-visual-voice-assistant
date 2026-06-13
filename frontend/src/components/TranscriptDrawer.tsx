@@ -6,6 +6,7 @@ interface TranscriptDrawerProps {
   open: boolean;
   messages: TranscriptMessage[];
   protocolStage: number;
+  readOnly?: boolean;
   onClose: () => void;
   onSendText: (text: string) => void;
 }
@@ -22,6 +23,7 @@ export function TranscriptDrawer({
   open,
   messages,
   protocolStage,
+  readOnly = false,
   onClose,
   onSendText,
 }: TranscriptDrawerProps) {
@@ -85,33 +87,37 @@ export function TranscriptDrawer({
         )}
       </div>
 
-      <form
-        className="transcript-composer"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!trimmedText) {
-            return;
-          }
-          onSendText(trimmedText);
-          setText("");
-        }}
-      >
-        <label>
-          <span>文字提问</span>
-          <textarea
-            ref={inputRef}
-            aria-label="文字提问"
-            maxLength={2000}
-            rows={3}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-          />
-        </label>
-        <button type="submit" disabled={!trimmedText}>
-          <SendHorizontal size={18} />
-          发送
-        </button>
-      </form>
+      {readOnly ? (
+        <p className="transcript-readonly">会话已结束，对话记录仅供查看。</p>
+      ) : (
+        <form
+          className="transcript-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!trimmedText) {
+              return;
+            }
+            onSendText(trimmedText);
+            setText("");
+          }}
+        >
+          <label>
+            <span>文字提问</span>
+            <textarea
+              ref={inputRef}
+              aria-label="文字提问"
+              maxLength={2000}
+              rows={3}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={!trimmedText}>
+            <SendHorizontal size={18} />
+            发送
+          </button>
+        </form>
+      )}
     </aside>
   );
 }

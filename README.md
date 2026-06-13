@@ -1,10 +1,10 @@
-# AI 视觉语音助手后端
+# AI 视觉语音助手
 
-这是一个基于 Gemini Live API 的实时多模态后端。客户端通过
+这是一个基于 Gemini Live API 的实时多模态视觉语音助手。客户端通过
 WebSocket 发送 PCM16 音频、JPEG 画面和文本，后端负责输入校验与调度、
 Gemini Live 会话管理、模型音频与转写转发，以及会话用量和生命周期控制。
 
-前端由独立项目开发。本仓库不包含前端代码，双方只通过
+前后端分别位于 `frontend/` 与 `backend/`，双方只通过
 [前端集成协议](docs/frontend-integration-contract.md) 协作。
 
 ## 环境要求
@@ -63,6 +63,22 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 队列容量、媒体限制、超时和 token 预算都必须为正数。token 用量以
 Gemini Live 返回的 usage metadata 为准，预算是会话保护限制，不是账单保证。
+
+## 前端本地运行
+
+前端位于 `frontend/`，后端位于 `backend/`，双方只通过
+`docs/frontend-integration-contract.md` 中的公开 WebSocket 协议协作。
+前端不会接触或打包 Gemini API Key。
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+默认连接 `ws://localhost:8000/ws`。如需修改地址，编辑
+`frontend/.env` 中的 `VITE_WS_URL`。
 
 ## WebSocket 会话流程
 

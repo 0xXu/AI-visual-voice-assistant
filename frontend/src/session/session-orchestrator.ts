@@ -52,10 +52,19 @@ export class SessionOrchestrator implements SessionControls {
       onStateChange: (state) => {
         if (state === "open") {
           client.send({ type: "start_session", data: "" });
+        } else if (state === "recovering") {
+          this.options.dispatch({ type: "SESSION_RECOVERING" });
         } else if (state === "error") {
           this.options.dispatch({
             type: "ERROR_RECEIVED",
             message: "实时连接异常，请稍后重试。",
+          });
+        } else if (state === "failed") {
+          this.connected = false;
+          this.stopCapture();
+          this.options.dispatch({
+            type: "ERROR_RECEIVED",
+            message: "连接失败，请检查网络后重新开始。",
           });
         }
       },

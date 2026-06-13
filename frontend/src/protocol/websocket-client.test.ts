@@ -33,13 +33,19 @@ class FakeWebSocket extends EventTarget {
 
   close() {
     this.readyState = FakeWebSocket.CLOSED;
-    this.dispatchEvent(new CloseEvent("close"));
+    this.dispatchEvent(new CloseEvent("close", { code: 1000, wasClean: true }));
+  }
+
+  abnormalClose() {
+    this.readyState = FakeWebSocket.CLOSED;
+    this.dispatchEvent(new CloseEvent("close", { code: 1006, wasClean: false }));
   }
 }
 
 const originalWebSocket = globalThis.WebSocket;
 
 afterEach(() => {
+  vi.useRealTimers();
   FakeWebSocket.instances = [];
   globalThis.WebSocket = originalWebSocket;
 });
@@ -72,5 +78,85 @@ describe("WebSocketClient", () => {
     });
 
     expect(client.send({ type: "start_session", data: "" })).toBe(false);
+  });
+
+  it("异常关闭时最多按退避重连三次", () => {
+    vi.useFakeTimers();
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    const onStateChange = vi.fn();
+    const client = new WebSocketClient({
+      url: "ws://localhost:8000/ws",
+      onMessage: vi.fn(),
+      onStateChange,
+    });
+
+    client.connect();
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].abnormalClose();
+    expect(onStateChange).toHaveBeenCalledWith("recovering");
+
+    vi.advanceTimersByTime(500);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+
+    FakeWebSocket.instances[1].abnormalClose();
+    vi.advanceTimersByTime(1000);
+    expect(FakeWebSocket.instances).toHaveLength(3);
+
+    FakeWebSocket.instances[2].abnormalClose();
+    vi.advanceTimersByTime(2000);
+    expect(FakeWebSocket.instances).toHaveLength(4);
+
+    FakeWebSocket.instances[3].abnormalClose();
+    vi.advanceTimersByTime(2000);
+    expect(FakeWebSocket.instances).toHaveLength(4);
+    expect(onStateChange).toHaveBeenLastCalledWith("failed");
+  });
+
+  it("重连成功后重置连续失败次数", () => {
+    vi.useFakeTimers();
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    const onStateChange = vi.fn();
+    const client = new WebSocketClient({
+      url: "ws://localhost:8000/ws",
+      onMessage: vi.fn(),
+      onStateChange,
+    });
+
+    client.connect();
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].abnormalClose();
+    vi.advanceTimersByTime(500);
+    FakeWebSocket.instances[1].open();
+    FakeWebSocket.instances[1].receive(
+      '{"type":"status","data":"connected"}',
+    );
+
+    FakeWebSocket.instances[1].abnormalClose();
+    vi.advanceTimersByTime(500);
+
+    expect(FakeWebSocket.instances).toHaveLength(3);
+    expect(onStateChange).toHaveBeenLastCalledWith("connecting");
+  });
+
+  it("首次连接重试耗尽后报告失败", () => {
+    vi.useFakeTimers();
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    const onStateChange = vi.fn();
+    const client = new WebSocketClient({
+      url: "ws://localhost:8000/ws",
+      onMessage: vi.fn(),
+      onStateChange,
+    });
+
+    client.connect();
+    FakeWebSocket.instances[0].abnormalClose();
+    vi.advanceTimersByTime(500);
+    FakeWebSocket.instances[1].abnormalClose();
+    vi.advanceTimersByTime(1000);
+    FakeWebSocket.instances[2].abnormalClose();
+    vi.advanceTimersByTime(2000);
+    FakeWebSocket.instances[3].abnormalClose();
+
+    expect(onStateChange).toHaveBeenLastCalledWith("failed");
   });
 });
