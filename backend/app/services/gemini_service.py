@@ -143,94 +143,109 @@ class GeminiSession:
 
     async def receive(self) -> AsyncIterator[GeminiResponse]:
         try:
-            async for response in self.session.receive():
-                resumption_update = response.session_resumption_update
-                if resumption_update is not None:
-                    resumable = resumption_update.resumable is True
-                    handle = None
-                    if resumable and resumption_update.new_handle:
-                        handle = resumption_update.new_handle
-                    yield GeminiResponse(
-                        payload={
-                            "type": "session_resumption",
-                            "data": {"resumable": resumable},
-                        },
-                        resumption_handle=handle,
-                        resumable=resumable,
-                    )
-
-                server_content = getattr(response, "server_content", None)
-                if server_content and server_content.interrupted:
-                    yield GeminiResponse(
-                        payload={"type": "interrupted", "data": ""}
-                    )
-
-                usage_metadata = response.usage_metadata
-                if usage_metadata is not None:
-                    yield GeminiResponse(usage_metadata=usage_metadata)
-
-                if server_content:
-                    input_transcription = getattr(
-                        server_content,
-                        "input_transcription",
-                        None,
-                    )
-                    if input_transcription and input_transcription.text:
+            while True:
+                async for response in self.session.receive():
+                    resumption_update = response.session_resumption_update
+                    if resumption_update is not None:
+                        resumable = resumption_update.resumable is True
+                        handle = None
+                        if resumable and resumption_update.new_handle:
+                            handle = resumption_update.new_handle
                         yield GeminiResponse(
                             payload={
-                                "type": "user_text",
-                                "data": input_transcription.text,
-                            }
+                                "type": "session_resumption",
+                                "data": {"resumable": resumable},
+                            },
+                            resumption_handle=handle,
+                            resumable=resumable,
                         )
 
-                    output_transcription = getattr(
-                        server_content,
-                        "output_transcription",
-                        None,
-                    )
-                    if output_transcription and output_transcription.text:
+                    server_content = getattr(response, "server_content", None)
+                    if server_content and server_content.interrupted:
+                        yield GeminiResponse(
+                            payload={"type": "interrupted", "data": ""}
+                        )
+
+                    usage_metadata = response.usage_metadata
+                    if usage_metadata is not None:
+                        yield GeminiResponse(usage_metadata=usage_metadata)
+
+                    if server_content:
+                        input_transcription = getattr(
+                            server_content,
+                            "input_transcription",
+                            None,
+                        )
+                        if input_transcription and input_transcription.text:
+                            yield GeminiResponse(
+                                payload={
+                                    "type": "user_text",
+                                    "data": input_transcription.text,
+                                }
+                            )
+
+                        output_transcription = getattr(
+                            server_content,
+                            "output_transcription",
+                            None,
+                        )
+                        if (
+                            output_transcription
+                            and output_transcription.text
+                        ):
+                            yield GeminiResponse(
+                                payload={
+                                    "type": "text",
+                                    "data": output_transcription.text,
+                                },
+                                model_output=True,
+                            )
+
+                        model_turn = getattr(
+                            server_content, "model_turn", None
+                        )
+                        if model_turn:
+                            for part in model_turn.parts:
+                                inline_data = getattr(
+                                    part, "inline_data", None
+                                )
+                                if inline_data and inline_data.data:
+                                    yield GeminiResponse(
+                                        payload={
+                                            "type": "audio",
+                                            "data": base64.b64encode(
+                                                inline_data.data
+                                            ).decode("ascii"),
+                                        },
+                                        model_output=True,
+                                    )
+
+                        if getattr(
+                            server_content, "turn_complete", False
+                        ):
+                            logger.debug("Gemini 本轮回复已完成")
+                            yield GeminiResponse(
+                                payload={
+                                    "type": "turn_complete",
+                                    "data": "",
+                                }
+                            )
+
+                    go_away = response.go_away
+                    if go_away is not None:
                         yield GeminiResponse(
                             payload={
-                                "type": "text",
-                                "data": output_transcription.text,
+                                "type": "go_away",
+                                "data": {
+                                    "time_left_ms": (
+                                        _duration_to_milliseconds(
+                                            go_away.time_left
+                                        )
+                                    )
+                                },
                             },
-                            model_output=True,
+                            go_away=True,
                         )
-
-                    model_turn = getattr(server_content, "model_turn", None)
-                    if model_turn:
-                        for part in model_turn.parts:
-                            inline_data = getattr(part, "inline_data", None)
-                            if inline_data and inline_data.data:
-                                yield GeminiResponse(
-                                    payload={
-                                        "type": "audio",
-                                        "data": base64.b64encode(
-                                            inline_data.data
-                                        ).decode("ascii"),
-                                    },
-                                    model_output=True,
-                                )
-
-                    if getattr(server_content, "turn_complete", False):
-                        logger.debug("Gemini 本轮回复已完成")
-                        yield GeminiResponse(
-                            payload={"type": "turn_complete", "data": ""}
-                        )
-
-                go_away = response.go_away
-                if go_away is not None:
-                    yield GeminiResponse(
-                        payload={
-                            "type": "go_away",
-                            "data": {
-                                "time_left_ms": _duration_to_milliseconds(
-                                    go_away.time_left
-                                )
-                            },
-                        },
-                        go_away=True,
-                    )
         except Exception:
             logger.exception("接收 Gemini 实时响应时发生异常")
             raise
