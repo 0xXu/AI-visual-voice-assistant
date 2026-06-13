@@ -1,34 +1,94 @@
-# AI 视觉语音助手
+<h1 align="center"> EchoSight </h1>
 
-这是一个基于 Gemini Live API 的实时多模态视觉对话应用。用户可以在浏览器
-中打开摄像头和麦克风，直接询问当前画面中的物品、环境或操作步骤，并获得
-实时语音与文字回答。
+<h3 align="center">让 AI 实时看见、听见并回应你所处的世界</h3>
 
-前后端分别位于 `frontend/` 与 `backend/`，双方只通过
-[前端集成协议](docs/frontend-integration-contract.md) 协作。
+<p align="center">基于 Gemini Live 的实时多模态视觉语音助手。</p>
 
-## 已实现功能
+<p align="center">面向持续变化的真实环境，让摄像头、语音和文字共享同一个对话上下文。</p>
 
-- 会话开始前检测并选择摄像头与麦克风。
-- 发送 16 kHz PCM16 音频、低帧率 JPEG 画面和文字问题。
-- 播放 24 kHz PCM16 模型语音，并显示用户与 AI 的实时转写。
-- 支持用户打断、麦克风静音、暂停画面和结束会话。
-- 网络异常时进行有限次数自动重连。
-- 显示完整对话记录、会话终止原因、token 用量和首响应延迟。
-- 后端提供输入校验、有界调度、空闲超时、最长时限和 token 预算保护。
-- 支持 Gemini GoAway 与会话恢复。
+<p align="center">
+  <a href="https://github.com/0xXu"><strong>演示视频</strong></a>
+  ·
+  <a href="./docs/DESIGN.md"><strong>设计文档</strong></a>
+</p>
 
-## 项目结构
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&amp;logo=react&amp;logoColor=white" alt="React 19">
+  <img src="https://img.shields.io/badge/FastAPI-Python-009688?style=flat-square&amp;logo=fastapi&amp;logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Gemini-Live-8E75B2?style=flat-square&amp;logo=googlegemini&amp;logoColor=white" alt="Gemini Live">
+  <img src="https://img.shields.io/badge/WebSocket-实时通信-2563EB?style=flat-square" alt="WebSocket">
+</p>
 
-```text
-.
-├── backend/    # FastAPI、Gemini Live 会话与 WebSocket 协议
-├── frontend/   # Vite、React、TypeScript 浏览器客户端
-├── docs/       # 前端集成协议、设计规格与实施计划
-└── DESIGN.md   # 前端视觉与交互规范
-```
+<p align="center">
+  <a href="#演示">演示</a>
+  ·
+  <a href="#功能说明">功能说明</a>
+  ·
+  <a href="#系统架构">系统架构</a>
+  ·
+  <a href="#本地运行">本地运行</a>
+  ·
+  <a href="#项目结构">项目结构</a>
+</p>
 
-## 环境要求
+---
+
+## 演示
+
+- **演示视频（占位）**：[https://github.com/0xXu](https://github.com/0xXu)
+- **设计文档**：[docs/DESIGN.md](./docs/DESIGN.md)
+
+> 当前链接暂作演示视频占位，正式视频发布后将替换。
+
+---
+
+## 功能说明
+
+> “镜头里有什么？下一步应该怎么操作？”
+
+一次实时会话同时处理：
+
+1. **摄像头画面**：浏览器将画面缩放、压缩为低帧率 JPEG，只发送最新且有效的帧。
+2. **麦克风音频**：通过 AudioWorklet 采集音频，重采样为 16 kHz PCM16 并持续发送。
+3. **文字提问**：用户可在完整对话记录中直接输入文字问题。
+4. **Gemini Live**：结合视觉、语音和上下文生成实时回答。
+5. **语音播放**：浏览器按顺序播放 24 kHz PCM16 模型语音。
+6. **实时转写**：同时展示用户语音转写和 AI 输出转写。
+7. **用户打断**：用户说话打断 AI 时，立即停止并清空旧的播放队列。
+8. **会话摘要**：结束后展示时长、首响应延迟、token 和视频帧统计。
+
+会话保持连续，不需要为每次追问重新上传图片或创建新的请求。
+
+---
+
+## 系统架构
+
+![AI 视觉语音助手系统架构](./architecture.svg)
+
+浏览器负责设备访问、媒体编码、状态展示和音频播放；FastAPI 后端负责协议校验、有界调度、会话限制、用量统计和 Gemini 连接。所有浏览器输入都通过 WebSocket 发送到后端，API Key 不会进入前端代码或浏览器存储。
+
+后端只保留最新待处理视频帧，并对音频和文字使用有界队列。Gemini 返回的音频、转写、打断、恢复和用量事件通过同一条 WebSocket 实时传回浏览器。
+
+---
+
+## 核心特性
+
+- **自然的多模态对话**：摄像头、语音和文字共享同一个 Gemini Live 上下文。
+- **低延迟语音链路**：16 kHz PCM16 输入，24 kHz PCM16 流式播放。
+- **用户可随时打断**：收到 `interrupted` 后立即停止当前模型语音。
+- **完整实时转写**：支持用户输入转写、AI 输出转写和文字提问。
+- **设备检查**：会话前预览摄像头、观察麦克风电平并选择输入设备。
+- **连接恢复**：浏览器 WebSocket 有限退避重连，后端支持 Gemini GoAway 和会话恢复。
+- **成本保护**：低分辨率视觉输入、仅保留最新视频帧、上下文压缩、空闲超时、最长时限和 token 预算。
+- **用量可观测**：记录音频、文字、视频、token、持续时间和首响应延迟。
+- **防御性协议**：严格校验 Base64、PCM16、JPEG 标记、帧时间戳、序列和消息大小。
+- **前后端安全边界**：Gemini API Key 仅存在于后端。
+
+---
+
+## 本地运行
+
+### 环境要求
 
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/)
@@ -36,9 +96,14 @@
 - npm
 - Google AI Studio `GEMINI_API_KEY`
 
-Gemini API Key 只配置在后端，不能写入前端环境变量、浏览器存储或构建产物。
+### 1. 克隆项目
 
-## 后端运行
+```bash
+git clone https://github.com/0xXu/AI-visual-voice-assistant.git
+cd AI-visual-voice-assistant
+```
+
+### 2. 启动后端
 
 ```bash
 cd backend
@@ -46,28 +111,28 @@ uv sync --locked
 cp .env.example .env
 ```
 
-编辑 `backend/.env`，填写真实密钥：
+在 `backend/.env` 中填写 Google AI Studio API Key：
 
 ```env
 GEMINI_API_KEY=你的_Google_AI_Studio_API_Key
 CORS_ORIGINS=http://localhost:5173
 ```
 
-启动服务：
+启动 FastAPI：
 
 ```bash
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-服务地址：
+后端服务：
 
-- 健康检查：`http://localhost:8000/health`
-- WebSocket：`ws://localhost:8000/ws`
-- OpenAPI：`http://localhost:8000/docs`
+- 健康检查：[http://localhost:8000/health](http://localhost:8000/health)
+- WebSocket: `ws://localhost:8000/ws`
+- OpenAPI 文档：[http://localhost:8000/docs](http://localhost:8000/docs)
 
-## 前端运行
+### 3. 启动前端
 
-另开一个终端：
+在另一个终端中运行：
 
 ```bash
 cd frontend
@@ -76,196 +141,145 @@ cp .env.example .env
 npm run dev
 ```
 
-打开 `http://localhost:5173`，允许浏览器访问摄像头与麦克风。
-
-前端默认配置：
+默认前端配置：
 
 ```env
 VITE_WS_URL=ws://localhost:8000/ws
 VITE_PROTOCOL_STAGE=8
 ```
 
-- `VITE_WS_URL`：后端 WebSocket 地址。
-- `VITE_PROTOCOL_STAGE`：部署环境支持的协议阶段，当前完整功能使用阶段 8。
-- 修改后端或前端地址时，需要同步更新 `CORS_ORIGINS` 和 `VITE_WS_URL`。
-- 摄像头与麦克风在生产环境中需要 HTTPS；`localhost` 可用于本地开发。
+打开 [http://localhost:5173](http://localhost:5173)，点击开始并允许浏览器访问摄像头和麦克风。
 
-## 后端环境配置
+> 摄像头和麦克风在生产环境需要 HTTPS；`localhost` 可直接用于本地开发。
 
-`backend/.env.example` 包含当前全部运行设置和默认值：
+---
 
-| 变量 | 默认值 | 说明 |
+## 会话流程
+
+```text
+建立 WebSocket
+      │
+      ├── start_session
+      ▼
+status: connected
+      │
+      ├── audio / video_frame / text
+      ▼
+Gemini Live 对话
+      │
+      ├── user_text / text / audio
+      ├── interrupted / turn_complete
+      └── go_away / session_resumption
+      ▼
+终止状态
+      │
+      └── 最终用量
+      ▼
+会话摘要
+```
+
+浏览器 WebSocket 和 Gemini 云会话拥有独立生命周期。同一条浏览器连接可以依次启动多个云会话；Gemini 不会在收到 `start_session` 前创建。
+
+默认会话保护：
+
+| 保护机制 | 默认值 | 作用 |
 |---|---:|---|
-| `GEMINI_API_KEY` | 空 | 必填的 Google AI Studio 密钥 |
-| `MODEL_NAME` | `gemini-3.1-flash-live-preview` | Gemini Live 模型 |
-| `VOICE_NAME` | `Aoede` | 模型语音 |
-| `CORS_ORIGINS` | `http://localhost:5173` | 逗号分隔的允许来源 |
-| `WEBSOCKET_KEEPALIVE_SECONDS` | `20` | 服务端心跳间隔 |
-| `MAX_AUDIO_BYTES` | `8192` | 单条音频解码后最大字节数 |
-| `MAX_VIDEO_BYTES` | `524288` | 单帧图片解码后最大字节数 |
-| `MAX_FRAME_AGE_MS` | `2000` | 图片时间戳允许的前后偏差 |
-| `MAX_TEXT_CHARS` | `2000` | 单条文本最大字符数 |
-| `AUDIO_QUEUE_CAPACITY` | `32` | 音频队列容量 |
-| `TEXT_QUEUE_CAPACITY` | `8` | 文本队列容量 |
-| `SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS` | `1.0` | 调度器关闭硬超时 |
-| `SESSION_IDLE_SECONDS` | `45.0` | 无已接受输入时的空闲超时 |
-| `SESSION_MAX_SECONDS` | `600.0` | 单个逻辑会话最长时间 |
-| `SESSION_TOKEN_BUDGET` | `50000` | 单个逻辑会话 token 预算 |
+| 空闲超时 | 45 秒 | 没有有效输入时释放云会话 |
+| 最长时限 | 600 秒 | 限制单次逻辑会话时长 |
+| Token 预算 | 50,000 | 达到预算后停止继续输入 |
+| 音频队列 | 32 个分块 | 防止音频无限积压 |
+| 文字队列 | 8 条消息 | 限制文字拥塞 |
+| 视频策略 | 仅保留最新帧 | 用最新画面替换过时帧 |
+| 连接保活 | 20 秒 | 使用 ping/pong 维持连接 |
 
-队列容量、媒体限制、超时和 token 预算都必须为正数。token 用量以
-Gemini Live 返回的 usage metadata 为准，预算是会话保护限制，不是账单保证。
+完整字段、顺序和兼容性规则见 [前端集成协议](./docs/frontend-integration-contract.md)。
 
-## WebSocket 会话流程
+---
 
-浏览器 WebSocket 与 Gemini 云会话相互独立。同一 WebSocket 可以依次运行
-多个云会话：
+## 成本与可靠性
 
-1. 连接 `ws://localhost:8000/ws`。
-2. 发送 `{"type":"start_session"}`。
-3. 收到 `{"type":"status","data":"connected"}` 后发送输入。
-4. 发送 `{"type":"stop_session"}`，或等待会话因限制结束。
-5. 后端先发送终止 `status`，再发送一次 `usage`。
-6. WebSocket 保持打开，可以再次发送 `start_session`。
+实时多模态应用的风险不仅是单次调用价格，还包括无效画面、长会话、网络积压和异常重连。项目在前后端两侧共同限制这些成本：
 
-Gemini 会话不会在 `start_session` 前创建。等待启动时仅接受
-`start_session`、`ping` 和 `pong`；其他消息会收到
-`请先发送 start_session`。活动会话中的重复 `start_session` 是空操作。
+- 视频默认约 1 fps，最长边 960 px，并按多个 JPEG 质量档位压缩。
+- 页面隐藏、摄像头暂停或 `WebSocket.bufferedAmount` 过高时跳过视频帧。
+- 后端只保留最新视频帧，不让旧画面排队进入模型。
+- Gemini Live 使用 `LOW` 媒体分辨率和滑动窗口上下文压缩。
+- 只有通过校验且被调度器接受的输入才刷新空闲时间并计入用量。
+- 空闲、最长时限和 token 预算只结束当前云会话，不强制关闭浏览器 WebSocket。
+- 恢复次数有明确上限，避免服务异常时无限重连。
 
-终止状态：
+更完整的设计取舍见 [设计与实现复盘](./docs/DESIGN.md)。
 
-| `status.data` | 含义 |
-|---|---|
-| `stopped` | 主动停止或 Gemini 响应流自然结束 |
-| `idle_timeout` | 默认 45 秒没有通过校验并被调度器接受的输入 |
-| `max_duration` | 默认达到 600 秒会话上限 |
-| `budget_exceeded` | Gemini 累计报告的 token 达到默认 50,000 |
+---
 
-上述终止条件只结束当前云会话。用户主动停止、空闲超时、最长时限和预算
-耗尽不会触发自动恢复。
+## 技术栈
 
-## 输入格式与限制
+- **前端**：React 19、TypeScript 6、Vite 8、Web Audio API、AudioWorklet、Canvas
+- **后端**：FastAPI、Python 3.11、asyncio、Pydantic Settings
+- **AI**：Gemini Live，默认模型 `gemini-3.1-flash-live-preview`
+- **SDK**：Google Gen AI SDK 2.x
+- **传输协议**：WebSocket、JSON、Base64 编码的 PCM16/JPEG
+- **身份验证**：Google AI Studio API Key，仅由后端读取
+- **测试工具**：pytest、Vitest、Testing Library
 
-### 文本
+---
 
-```json
-{"type":"text","data":"请描述镜头中的内容"}
+## 项目结构
+
+```text
+AI-visual-voice-assistant/
+├── architecture.svg
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── messages.py          # WebSocket 消息解析与媒体校验
+│   │   │   └── websocket.py         # 会话生命周期与实时事件转发
+│   │   ├── core/
+│   │   │   └── config.py            # 模型、队列、时限和预算配置
+│   │   ├── services/
+│   │   │   ├── gemini_service.py    # Gemini Live 连接与事件转换
+│   │   │   ├── input_scheduler.py   # 有界公平调度与仅保留最新视频帧
+│   │   │   ├── session_runtime.py   # 空闲和最长时限
+│   │   │   └── usage.py             # 媒体、token 和延迟统计
+│   │   └── main.py                   # FastAPI 入口
+│   └── tests/
+├── frontend/
+│   ├── public/
+│   │   └── audio-capture.worklet.js
+│   └── src/
+│       ├── app/                      # 页面状态与 reducer
+│       ├── components/               # 设备检查、实时会话、记录和结果页
+│       ├── media/                    # 音频采集、视频抽帧和语音播放
+│       ├── protocol/                 # WebSocket 客户端与强类型消息
+│       └── session/                  # 会话编排
+└── docs/
+    ├── DESIGN.md                     # 用户故事与成本设计复盘
+    └── frontend-integration-contract.md
 ```
 
-文本必须非空，默认最多 2,000 个字符。
+---
 
-### 音频
+## 工程实践
 
-```json
-{"type":"audio","data":"<base64-pcm16>"}
-```
+### 视觉信息的新鲜度比逐帧送达更重要
 
-音频必须是 16 kHz、单声道、16 位小端 PCM。Base64 使用严格校验，解码后
-默认不超过 8,192 字节，且 PCM16 字节数必须为偶数。
+实时视觉问答不需要完整视频流。旧帧即使最终送达，也可能让模型回答已经变化的场景。前端在拥塞时跳帧，后端只保留最新序列，让视觉上下文保持新鲜，同时降低带宽和模型输入成本。
 
-### 图片
+### 用户打断必须立即清空播放队列
 
-```json
-{
-  "type":"video_frame",
-  "data":"<base64-jpeg>",
-  "timestamp":1781234567890,
-  "sequence":42
-}
-```
+模型可能已经发送了多个待播放音频块。仅改变 UI 状态不会停止旧回答；收到 `interrupted` 时必须同时停止当前音频节点并清空播放队列，用户才能真正接管对话。
 
-图片必须通过严格 Base64 校验，解码后默认不超过 524,288 字节，并包含
-JPEG SOI/EOI 起止标记。`timestamp` 是 Unix 毫秒整数，默认只接受与后端
-时间相差不超过 2,000 ms 的帧；`sequence` 必须递增。
+### 浏览器连接与云端会话是两种资源
 
-### 心跳
+网络连接仍然可用，不代表应该一直占用 Gemini Live。显式 `start_session` / `stop_session`、空闲超时和 token 预算让一个浏览器 WebSocket 可以安全地承载多个受控云会话。
 
-```json
-{"type":"ping"}
-{"type":"pong"}
-```
+### 自动恢复必须有明确边界
 
-后端每 20 秒默认发送一次 `ping`，收到客户端 `ping` 时回复 `pong`。
+项目支持浏览器 WebSocket 重连和 Gemini 会话恢复，但不会无限重试。恢复失败时最多回退到一次全新 Gemini 连接，防止故障期间持续创建连接或重复消耗资源。
 
-## 输入调度
+---
 
-- 音频和文本分别使用容量为 32 和 8 的有界队列。
-- 调度器按批次优先处理文本和音频，同时保证待处理图片能够继续发送。
-- 图片只保留最新帧；新序列替换尚未发送的旧帧，重复或倒退序列被忽略。
-- 每种音频和文本最多保留一个等待入队的提交；继续拥塞时返回中文错误。
-- 只有通过校验且被调度器接受的输入才刷新空闲计时并计入 usage。
-- 会话关闭时唤醒等待提交者，在默认 1 秒硬超时内排空或取消后台任务。
-
-## Gemini Live 配置
-
-- 仅使用 Google AI Studio API Key 认证。
-- 响应模态为音频，启用输入和输出语音转写。
-- 启用自动语音活动检测。
-- 媒体分辨率固定为 `LOW`，降低实时视觉输入成本。
-- 启用滑动窗口 context compression，控制长会话上下文增长。
-- 模型输出音频为 24 kHz、单声道、16 位 PCM。
-
-## 服务端事件
-
-常规模型事件：
-
-```json
-{"type":"user_text","data":"用户语音转写文本"}
-{"type":"text","data":"模型转写文本"}
-{"type":"audio","data":"<base64-pcm16-24khz>"}
-{"type":"turn_complete","data":""}
-```
-
-`user_text` 从协议阶段 8 开始提供。输入转写可能分片到达，并且与模型
-`turn_complete` 没有固定先后关系；前端按到达顺序追加用户语音文本。
-
-Gemini 报告用户打断时，后端先转发：
-
-```json
-{"type":"interrupted","data":""}
-```
-
-每个云会话结束时发送一次结构化用量：
-
-```json
-{
-  "type":"usage",
-  "data":{
-    "audio_bytes":32000,
-    "text_chars":120,
-    "video_frames":8,
-    "video_replaced_frames":3,
-    "video_bytes":180000,
-    "input_tokens":1200,
-    "output_tokens":340,
-    "total_tokens":1540,
-    "duration_ms":25000,
-    "first_response_latency_ms":480
-  }
-}
-```
-
-`first_response_latency_ms` 在没有完整输入和响应时间点时为 `null`。
-
-Gemini 发布可恢复状态时，后端只公开布尔值，不公开不透明恢复句柄：
-
-```json
-{"type":"session_resumption","data":{"resumable":true}}
-```
-
-Gemini 要求迁移连接时，后端转发剩余时间：
-
-```json
-{"type":"go_away","data":{"time_left_ms":5000}}
-```
-
-收到 GoAway 后，后端最多使用最新有效句柄自动恢复一次；恢复连接建立失败时，
-最多再回退到一次不带句柄的新连接。恢复前后的空闲时间、最长时限和 usage
-计数属于同一个逻辑会话，最终仍只发送一次终止 `status` 和一次 `usage`。
-
-完整消息字段、顺序和兼容性要求见
-[前端集成协议](docs/frontend-integration-contract.md)。
-
-## 验证与构建
+## 验证
 
 后端：
 
@@ -280,18 +294,31 @@ uv run python -m compileall -q app tests
 
 ```bash
 cd frontend
+npm install
 npm test
 npm run build
 ```
 
 当前测试基线：
 
-- 后端：117 项测试。
-- 前端：28 项测试。
+- 后端：118 项测试
+- 前端：29 项测试
 
-## 设计与协议文档
+---
 
-- [前端集成协议](docs/frontend-integration-contract.md)
-- [前端设计规格](docs/superpowers/specs/2026-06-12-ai-visual-conversation-frontend-design.md)
-- [实施计划](docs/superpowers/plans/2026-06-12-ai-visual-conversation-frontend.md)
-- [视觉设计规范](DESIGN.md)
+## 项目文档
+
+- [设计与实现复盘](./docs/DESIGN.md)
+- [前端集成协议](./docs/frontend-integration-contract.md)
+- [前端设计规格](./docs/superpowers/specs/2026-06-12-ai-visual-conversation-frontend-design.md)
+- [前端实施计划](./docs/superpowers/plans/2026-06-12-ai-visual-conversation-frontend.md)
+- [后端质量与成本优化计划](./docs/superpowers/plans/2026-06-12-realtime-quality-cost-optimization.md)
+
+---
+
+## 安全说明
+
+- 不要提交 `backend/.env` 或任何真实 API Key。
+- 不要把 `GEMINI_API_KEY` 放入 `VITE_*` 环境变量。
+- 前端只连接本项目后端，不直接连接 Gemini。
+- 生产环境应限制 `CORS_ORIGINS`，并在 HTTPS/WSS 后运行。
