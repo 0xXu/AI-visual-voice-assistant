@@ -1,10 +1,20 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 const originalMediaDevicesDescriptor = Object.getOwnPropertyDescriptor(
   navigator,
   "mediaDevices",
+);
+const originalSrcObjectDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLMediaElement.prototype,
+  "srcObject",
 );
 
 function createMediaFixture() {
@@ -38,6 +48,16 @@ afterEach(() => {
     );
   } else {
     Reflect.deleteProperty(navigator, "mediaDevices");
+  }
+
+  if (originalSrcObjectDescriptor) {
+    Object.defineProperty(
+      HTMLMediaElement.prototype,
+      "srcObject",
+      originalSrcObjectDescriptor,
+    );
+  } else {
+    Reflect.deleteProperty(HTMLMediaElement.prototype, "srcObject");
   }
 });
 
@@ -113,5 +133,55 @@ describe("App", () => {
 
     expect(sendText).toHaveBeenCalledWith("帮我看看桌面");
     expect(screen.getByLabelText("文字提问")).toHaveValue("");
+  });
+
+  it("模型回答状态更新时不会重复绑定摄像头画面", async () => {
+    createMediaFixture();
+    const srcObjectAssignments = new WeakMap<HTMLVideoElement, number>();
+    Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
+      configurable: true,
+      set(value) {
+        void value;
+        const video = this as HTMLVideoElement;
+        srcObjectAssignments.set(
+          video,
+          (srcObjectAssignments.get(video) ?? 0) + 1,
+        );
+      },
+    });
+
+    let dispatch: ((action: { type: "MODEL_AUDIO_STARTED" }) => void) | null =
+      null;
+    const createOrchestrator = vi.fn((options) => {
+      dispatch = options.dispatch;
+      return {
+        start: vi.fn(),
+        sendText: vi.fn(),
+        setMuted: vi.fn(),
+        setVideoPaused: vi.fn(),
+        stop: vi.fn(),
+        destroy: vi.fn(),
+      };
+    });
+
+    render(<App createOrchestrator={createOrchestrator} />);
+    fireEvent.click(screen.getByRole("button", { name: "开始视觉对话" }));
+    fireEvent.click(await screen.findByRole("button", { name: "开始会话" }));
+
+    const video = document.querySelector<HTMLVideoElement>(
+      ".live-screen video",
+    );
+    expect(video).not.toBeNull();
+    const assignmentsBeforeModelAudio = srcObjectAssignments.get(video!);
+    expect(assignmentsBeforeModelAudio).toBe(1);
+
+    act(() => {
+      dispatch?.({ type: "MODEL_AUDIO_STARTED" });
+      dispatch?.({ type: "MODEL_AUDIO_STARTED" });
+    });
+
+    expect(srcObjectAssignments.get(video!)).toBe(
+      assignmentsBeforeModelAudio,
+    );
   });
 });

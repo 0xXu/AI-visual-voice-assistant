@@ -32,10 +32,15 @@ export function LiveSessionScreen({
   onStop,
 }: LiveSessionScreenProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const onVideoReadyRef = useRef(onVideoReady);
   const latestMessage = useMemo(
     () => state.messages.at(-1),
     [state.messages],
   );
+
+  useEffect(() => {
+    onVideoReadyRef.current = onVideoReady;
+  }, [onVideoReady]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -44,8 +49,8 @@ export function LiveSessionScreen({
     }
 
     video.srcObject = stream;
-    onVideoReady(video);
-  }, [onVideoReady, stream]);
+    onVideoReadyRef.current(video);
+  }, [stream]);
 
   return (
     <main className="live-screen screen-enter">
