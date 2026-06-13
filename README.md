@@ -16,7 +16,7 @@
 - 网络异常时进行有限次数自动重连。
 - 显示完整对话记录、会话终止原因、token 用量和首响应延迟。
 - 后端提供输入校验、有界调度、空闲超时、最长时限和 token 预算保护。
-- 支持 Gemini GoAway 与透明会话恢复。
+- 支持 Gemini GoAway 与会话恢复。
 
 ## 项目结构
 
@@ -99,7 +99,7 @@ VITE_PROTOCOL_STAGE=8
 | `GEMINI_API_KEY` | 空 | 必填的 Google AI Studio 密钥 |
 | `MODEL_NAME` | `gemini-3.1-flash-live-preview` | Gemini Live 模型 |
 | `VOICE_NAME` | `Aoede` | 模型语音 |
-| `CORS_ORIGINS` | `http://localhost:3000` | 逗号分隔的允许来源；本地 Vite 开发需改为 `http://localhost:5173` |
+| `CORS_ORIGINS` | `http://localhost:5173` | 逗号分隔的允许来源 |
 | `WEBSOCKET_KEEPALIVE_SECONDS` | `20` | 服务端心跳间隔 |
 | `MAX_AUDIO_BYTES` | `8192` | 单条音频解码后最大字节数 |
 | `MAX_VIDEO_BYTES` | `524288` | 单帧图片解码后最大字节数 |

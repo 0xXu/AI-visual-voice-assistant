@@ -39,7 +39,7 @@ Protocol stages:
 | 3 | Released: explicit session lifecycle |
 | 5 | Released: usage and budget events |
 | 6 | Released: interruption event |
-| 7 | Released: GoAway and transparent session resumption |
+| 7 | Released: GoAway and session resumption |
 | 8 | Released: user audio transcription event |
 
 ## Endpoint

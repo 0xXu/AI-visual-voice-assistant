@@ -79,7 +79,6 @@ def build_live_config(
         ),
         session_resumption=types.SessionResumptionConfig(
             handle=resume_handle,
-            transparent=True,
         ),
     )
 

@@ -71,9 +71,8 @@ def test_build_live_config_uses_cost_safe_live_defaults():
         == "Kore"
     )
     assert config.system_instruction == SYSTEM_PROMPT
-    assert config.session_resumption == types.SessionResumptionConfig(
-        transparent=True
-    )
+    assert config.session_resumption == types.SessionResumptionConfig()
+    assert config.session_resumption.transparent is None
 
 
 def test_build_live_config_includes_resume_handle():
@@ -86,8 +85,8 @@ def test_build_live_config_includes_resume_handle():
 
     assert config.session_resumption == types.SessionResumptionConfig(
         handle="opaque-handle",
-        transparent=True,
     )
+    assert config.session_resumption.transparent is None
 
 
 def test_connect_uses_live_config_builder(monkeypatch):

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     model_name: str = "gemini-3.1-flash-live-preview"
     voice_name: str = "Aoede"
 
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:5173"
     websocket_keepalive_seconds: float = 20.0
     max_audio_bytes: PositiveInt = 8_192
     max_video_bytes: PositiveInt = 524_288
