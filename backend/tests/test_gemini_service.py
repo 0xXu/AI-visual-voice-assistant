@@ -22,6 +22,13 @@ class FakeSession:
         self.calls.append(kwargs)
 
 
+async def collect_responses(session, count):
+    iterator = GeminiSession(session).receive()
+    responses = [await anext(iterator) for _ in range(count)]
+    await iterator.aclose()
+    return responses
+
+
 def test_prompt_defines_visual_conversation_behavior():
     required_phrases = [
         "优先回答用户当前的问题",
@@ -164,13 +171,7 @@ def test_maps_live_server_usage_metadata_with_sdk_type():
         async def receive(self):
             yield types.LiveServerMessage(usage_metadata=metadata)
 
-    async def collect():
-        return [
-            event
-            async for event in GeminiSession(ReceivingSession()).receive()
-        ]
-
-    assert asyncio.run(collect()) == [
+    assert asyncio.run(collect_responses(ReceivingSession(), 1)) == [
         GeminiResponse(usage_metadata=metadata)
     ]
 
@@ -186,13 +187,7 @@ def test_maps_input_audio_transcription_to_user_text():
         async def receive(self):
             yield message
 
-    async def collect():
-        return [
-            event
-            async for event in GeminiSession(ReceivingSession()).receive()
-        ]
-
-    assert asyncio.run(collect()) == [
+    assert asyncio.run(collect_responses(ReceivingSession(), 1)) == [
         GeminiResponse(
             payload={"type": "user_text", "data": "用户说的话"}
         )
@@ -225,13 +220,7 @@ def test_interruption_precedes_same_message_outputs_and_is_emitted_once():
         async def receive(self):
             yield message
 
-    async def collect():
-        return [
-            event
-            async for event in GeminiSession(ReceivingSession()).receive()
-        ]
-
-    assert asyncio.run(collect()) == [
+    assert asyncio.run(collect_responses(ReceivingSession(), 6)) == [
         GeminiResponse(payload={"type": "interrupted", "data": ""}),
         GeminiResponse(usage_metadata=metadata),
         GeminiResponse(
@@ -263,13 +252,7 @@ def test_false_interruption_does_not_emit_an_event():
         async def receive(self):
             yield message
 
-    async def collect():
-        return [
-            event
-            async for event in GeminiSession(ReceivingSession()).receive()
-        ]
-
-    assert asyncio.run(collect()) == [
+    assert asyncio.run(collect_responses(ReceivingSession(), 1)) == [
         GeminiResponse(
             payload={"type": "turn_complete", "data": ""}
         )
@@ -289,13 +272,7 @@ def test_translates_resumption_update_without_exposing_handle():
         async def receive(self):
             yield message
 
-    async def collect():
-        return [
-            event
-            async for event in GeminiSession(ReceivingSession()).receive()
-        ]
-
-    assert asyncio.run(collect()) == [
+    assert asyncio.run(collect_responses(ReceivingSession(), 1)) == [
         GeminiResponse(
             payload={
                 "type": "session_resumption",
@@ -316,13 +293,7 @@ def test_translates_go_away_deadline_to_milliseconds():
         async def receive(self):
             yield message
 
-    async def collect():
-        return [
-            event
-            async for event in GeminiSession(ReceivingSession()).receive()
-        ]
-
-    assert asyncio.run(collect()) == [
+    assert asyncio.run(collect_responses(ReceivingSession(), 1)) == [
         GeminiResponse(
             payload={
                 "type": "go_away",
@@ -330,4 +301,44 @@ def test_translates_go_away_deadline_to_milliseconds():
             },
             go_away=True,
         )
+    ]
+
+
+def test_receive_continues_after_completed_model_turn():
+    class ReceivingSession:
+        def __init__(self):
+            self.receive_calls = 0
+
+        async def receive(self):
+            self.receive_calls += 1
+            yield types.LiveServerMessage(
+                server_content=types.LiveServerContent(
+                    output_transcription=types.Transcription(
+                        text=f"第{self.receive_calls}轮"
+                    ),
+                    turn_complete=True,
+                )
+            )
+
+    async def collect_two_turns():
+        raw_session = ReceivingSession()
+        iterator = GeminiSession(raw_session).receive()
+        responses = [await anext(iterator) for _ in range(4)]
+        await iterator.aclose()
+        return raw_session.receive_calls, responses
+
+    receive_calls, responses = asyncio.run(collect_two_turns())
+
+    assert receive_calls == 2
+    assert responses == [
+        GeminiResponse(
+            payload={"type": "text", "data": "第1轮"},
+            model_output=True,
+        ),
+        GeminiResponse(payload={"type": "turn_complete", "data": ""}),
+        GeminiResponse(
+            payload={"type": "text", "data": "第2轮"},
+            model_output=True,
+        ),
+        GeminiResponse(payload={"type": "turn_complete", "data": ""}),
     ]
