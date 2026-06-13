@@ -1,29 +1,57 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DeviceCheckScreen } from "../components/DeviceCheckScreen";
 import { EntryScreen } from "../components/EntryScreen";
+import { LiveSessionScreen } from "../components/LiveSessionScreen";
+import {
+  type CreateOrchestrator,
+  useSession,
+} from "../hooks/useSession";
 import {
   type DeviceOptions,
   MediaController,
 } from "../media/media-controller";
 
-type Screen = "entry" | "device-check";
+type Screen = "entry" | "device-check" | "live-session";
+
+export interface AppProps {
+  createOrchestrator?: CreateOrchestrator;
+}
 
 function getMediaErrorName(error: unknown) {
   return error instanceof DOMException ? error.name : "UnknownError";
 }
 
-export function App() {
+export function App({ createOrchestrator }: AppProps = {}) {
   const controllerRef = useRef<MediaController | null>(null);
+  const sessionStartedRef = useRef(false);
   const [screen, setScreen] = useState<Screen>("entry");
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const {
+    state,
+    startSession,
+    toggleMute,
+    toggleVideo,
+    stopSession,
+  } = useSession(createOrchestrator);
 
   useEffect(() => {
     return () => {
       controllerRef.current?.stop();
     };
   }, []);
+
+  const handleVideoReady = useCallback(
+    (video: HTMLVideoElement) => {
+      if (!stream || sessionStartedRef.current) {
+        return;
+      }
+      sessionStartedRef.current = true;
+      startSession(stream, video);
+    },
+    [startSession, stream],
+  );
 
   const controller = () => {
     controllerRef.current ??= new MediaController();
@@ -53,7 +81,26 @@ export function App() {
         error={error}
         onRetry={() => void openDevices()}
         onDeviceChange={(options) => void openDevices(options)}
-        onConfirm={() => undefined}
+        onConfirm={() => {
+          if (stream) {
+            sessionStartedRef.current = false;
+            setScreen("live-session");
+          }
+        }}
+      />
+    );
+  }
+
+  if (screen === "live-session" && stream) {
+    return (
+      <LiveSessionScreen
+        stream={stream}
+        state={state}
+        onVideoReady={handleVideoReady}
+        onToggleMute={toggleMute}
+        onToggleVideo={toggleVideo}
+        onFlipCamera={() => undefined}
+        onStop={stopSession}
       />
     );
   }
