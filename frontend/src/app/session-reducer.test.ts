@@ -63,4 +63,68 @@ describe("sessionReducer", () => {
       }).phase,
     ).toBe("ended");
   });
+
+  it("把连续 AI 文本片段追加到当前消息", () => {
+    const first = sessionReducer(initialSessionState, {
+      type: "MODEL_TEXT",
+      text: "杯子在",
+    });
+    const second = sessionReducer(first, {
+      type: "MODEL_TEXT",
+      text: "电脑右侧",
+    });
+
+    expect(second.messages.at(-1)?.text).toBe("杯子在电脑右侧");
+  });
+
+  it("turn_complete 固化当前 AI 消息", () => {
+    const stateWithStreamingAssistant: SessionState = {
+      ...initialSessionState,
+      phase: "speaking",
+      messages: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          text: "杯子在电脑右侧",
+          source: "voice",
+          complete: false,
+        },
+      ],
+    };
+
+    const next = sessionReducer(stateWithStreamingAssistant, {
+      type: "TURN_COMPLETE",
+    });
+
+    expect(next.messages.at(-1)?.complete).toBe(true);
+  });
+
+  it("把用户语音转写追加到当前语音消息", () => {
+    const started = sessionReducer(initialSessionState, {
+      type: "VOICE_TURN_STARTED",
+    });
+    const first = sessionReducer(started, {
+      type: "USER_TEXT",
+      text: "桌上这个",
+    });
+    const second = sessionReducer(first, {
+      type: "USER_TEXT",
+      text: "是什么？",
+    });
+
+    expect(second.messages).toHaveLength(1);
+    expect(second.messages.at(-1)?.text).toBe("桌上这个是什么？");
+  });
+
+  it("语音占位未完成时不会重复插入", () => {
+    const first = sessionReducer(initialSessionState, {
+      type: "VOICE_TURN_STARTED",
+    });
+    const second = sessionReducer(first, {
+      type: "VOICE_TURN_STARTED",
+    });
+
+    expect(second.messages).toHaveLength(1);
+    expect(second.messages.at(-1)?.text).toBe("语音提问");
+  });
 });

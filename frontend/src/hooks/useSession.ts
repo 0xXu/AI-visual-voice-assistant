@@ -47,6 +47,9 @@ export function useSession(createOrchestrator?: CreateOrchestrator) {
     sendText: (text: string) => {
       getOrchestrator().sendText(text);
     },
+    setTranscriptOpen: (open: boolean) => {
+      dispatch({ type: "SET_TRANSCRIPT_OPEN", open });
+    },
     toggleMute: () => {
       getOrchestrator().setMuted(!state.muted);
     },
@@ -56,5 +59,6 @@ export function useSession(createOrchestrator?: CreateOrchestrator) {
     stopSession: () => {
       getOrchestrator().stop();
     },
+    protocolStage: defaultProtocolStage,
   };
 }

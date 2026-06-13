@@ -31,9 +31,12 @@ export function App({ createOrchestrator }: AppProps = {}) {
   const {
     state,
     startSession,
+    sendText,
+    setTranscriptOpen,
     toggleMute,
     toggleVideo,
     stopSession,
+    protocolStage,
   } = useSession(createOrchestrator);
 
   useEffect(() => {
@@ -97,6 +100,10 @@ export function App({ createOrchestrator }: AppProps = {}) {
         stream={stream}
         state={state}
         onVideoReady={handleVideoReady}
+        protocolStage={protocolStage}
+        onOpenTranscript={() => setTranscriptOpen(true)}
+        onCloseTranscript={() => setTranscriptOpen(false)}
+        onSendText={sendText}
         onToggleMute={toggleMute}
         onToggleVideo={toggleVideo}
         onFlipCamera={() => undefined}
