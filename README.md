@@ -73,7 +73,7 @@ Gemini Live 返回的 usage metadata 为准，预算是会话保护限制，不�
 ```bash
 cd frontend
 npm install
-copy .env.example .env
+cp .env.example .env
 npm run dev
 ```
 

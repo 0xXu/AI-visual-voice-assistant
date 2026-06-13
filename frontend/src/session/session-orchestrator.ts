@@ -59,7 +59,7 @@ export class SessionOrchestrator implements SessionControls {
             type: "ERROR_RECEIVED",
             message: "实时连接异常，请稍后重试。",
           });
-        } else if (state === "closed" && this.connected) {
+        } else if (state === "failed") {
           this.connected = false;
           this.stopCapture();
           this.options.dispatch({

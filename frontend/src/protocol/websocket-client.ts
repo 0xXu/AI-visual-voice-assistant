@@ -9,6 +9,7 @@ export type WebSocketState =
   | "open"
   | "closed"
   | "error"
+  | "failed"
   | "recovering";
 
 export interface WebSocketClientOptions {
@@ -53,6 +54,9 @@ export class WebSocketClient {
         if (message.type === "ping") {
           this.send({ type: "pong", data: "" });
         }
+        if (message.type === "status" && message.data === "connected") {
+          this.reconnectAttempts = 0;
+        }
         this.options.onMessage(message);
       } catch {
         this.options.onStateChange("error");
@@ -69,6 +73,11 @@ export class WebSocketClient {
       }
       if (this.shouldReconnect(event)) {
         this.scheduleReconnect();
+      } else if (
+        !this.manuallyClosed &&
+        (!event.wasClean || event.code !== 1000)
+      ) {
+        this.options.onStateChange("failed");
       } else {
         this.options.onStateChange("closed");
       }

@@ -147,6 +147,7 @@ export function App({ createOrchestrator }: AppProps = {}) {
           open={state.transcriptOpen}
           messages={state.messages}
           protocolStage={protocolStage}
+          readOnly
           onClose={() => setTranscriptOpen(false)}
           onSendText={sendText}
         />

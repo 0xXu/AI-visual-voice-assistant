@@ -40,7 +40,7 @@ export function SessionSummary({
   return (
     <main className="summary-screen screen-enter">
       <section className="summary-panel">
-        <p className="eyebrow">EchoSight 会话结果</p>
+        <p className="eyebrow">视觉对话 · 会话结果</p>
         <h1>{usage ? reason : "正在整理本次会话"}</h1>
         <p className="summary-description">
           {usage

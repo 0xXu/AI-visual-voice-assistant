@@ -1040,6 +1040,15 @@
   opacity: 0.48;
 }
 
+.transcript-readonly {
+  margin: 0;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
 .summary-screen {
   display: grid;
   place-items: center;
