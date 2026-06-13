@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DeviceCheckScreen } from "../components/DeviceCheckScreen";
 import { EntryScreen } from "../components/EntryScreen";
 import { LiveSessionScreen } from "../components/LiveSessionScreen";
+import { SessionSummary } from "../components/SessionSummary";
+import { TranscriptDrawer } from "../components/TranscriptDrawer";
 import {
   type CreateOrchestrator,
   useSession,
@@ -11,7 +13,7 @@ import {
   MediaController,
 } from "../media/media-controller";
 
-type Screen = "entry" | "device-check" | "live-session";
+type Screen = "entry" | "device-check" | "live-session" | "summary";
 
 export interface AppProps {
   createOrchestrator?: CreateOrchestrator;
@@ -36,6 +38,7 @@ export function App({ createOrchestrator }: AppProps = {}) {
     toggleMute,
     toggleVideo,
     stopSession,
+    resetSession,
     protocolStage,
   } = useSession(createOrchestrator);
 
@@ -44,6 +47,15 @@ export function App({ createOrchestrator }: AppProps = {}) {
       controllerRef.current?.stop();
     };
   }, []);
+
+  useEffect(() => {
+    if (state.phase !== "ended") {
+      return;
+    }
+
+    controllerRef.current?.stop();
+    setScreen("summary");
+  }, [state.phase]);
 
   const handleVideoReady = useCallback(
     (video: HTMLVideoElement) => {
@@ -74,6 +86,15 @@ export function App({ createOrchestrator }: AppProps = {}) {
       setError(getMediaErrorName(nextError));
       setScreen("device-check");
     }
+  };
+
+  const restartSession = () => {
+    sessionStartedRef.current = false;
+    resetSession();
+    setStream(null);
+    setDevices([]);
+    setError(null);
+    void openDevices();
   };
 
   if (screen === "device-check") {
@@ -109,6 +130,27 @@ export function App({ createOrchestrator }: AppProps = {}) {
         onFlipCamera={() => undefined}
         onStop={stopSession}
       />
+    );
+  }
+
+  if (screen === "summary") {
+    return (
+      <>
+        <SessionSummary
+          terminalStatus={state.terminalStatus}
+          usage={state.usage}
+          messages={state.messages}
+          onRestart={restartSession}
+          onOpenTranscript={() => setTranscriptOpen(true)}
+        />
+        <TranscriptDrawer
+          open={state.transcriptOpen}
+          messages={state.messages}
+          protocolStage={protocolStage}
+          onClose={() => setTranscriptOpen(false)}
+          onSendText={sendText}
+        />
+      </>
     );
   }
 

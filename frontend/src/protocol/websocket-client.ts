@@ -4,7 +4,12 @@ import {
   type ServerMessage,
 } from "./messages";
 
-export type WebSocketState = "connecting" | "open" | "closed" | "error";
+export type WebSocketState =
+  | "connecting"
+  | "open"
+  | "closed"
+  | "error"
+  | "recovering";
 
 export interface WebSocketClientOptions {
   url: string;
@@ -14,6 +19,10 @@ export interface WebSocketClientOptions {
 
 export class WebSocketClient {
   private socket: WebSocket | null = null;
+  private reconnectAttempts = 0;
+  private readonly reconnectDelays = [500, 1000, 2000];
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private manuallyClosed = false;
 
   constructor(private readonly options: WebSocketClientOptions) {}
 
@@ -25,6 +34,11 @@ export class WebSocketClient {
       return;
     }
 
+    this.manuallyClosed = false;
+    this.openSocket();
+  }
+
+  private openSocket(): void {
     this.options.onStateChange("connecting");
     const socket = new WebSocket(this.options.url);
     this.socket = socket;
@@ -49,11 +63,15 @@ export class WebSocketClient {
       this.options.onStateChange("error");
     });
 
-    socket.addEventListener("close", () => {
+    socket.addEventListener("close", (event) => {
       if (this.socket === socket) {
         this.socket = null;
       }
-      this.options.onStateChange("closed");
+      if (this.shouldReconnect(event)) {
+        this.scheduleReconnect();
+      } else {
+        this.options.onStateChange("closed");
+      }
     });
   }
 
@@ -70,6 +88,11 @@ export class WebSocketClient {
   }
 
   close(): void {
+    this.manuallyClosed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     const socket = this.socket;
     this.socket = null;
     if (
@@ -78,5 +101,23 @@ export class WebSocketClient {
     ) {
       socket.close(1000, "客户端结束连接");
     }
+  }
+
+  private shouldReconnect(event: CloseEvent): boolean {
+    return (
+      !this.manuallyClosed &&
+      (!event.wasClean || event.code !== 1000) &&
+      this.reconnectAttempts < this.reconnectDelays.length
+    );
+  }
+
+  private scheduleReconnect(): void {
+    const delay = this.reconnectDelays[this.reconnectAttempts];
+    this.reconnectAttempts += 1;
+    this.options.onStateChange("recovering");
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.openSocket();
+    }, delay);
   }
 }

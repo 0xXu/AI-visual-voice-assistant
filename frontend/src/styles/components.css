@@ -1040,6 +1040,111 @@
   opacity: 0.48;
 }
 
+.summary-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100svh;
+  padding: var(--space-6);
+  background:
+    radial-gradient(
+      circle at 25% 15%,
+      rgba(var(--color-accent-rgb), 0.12),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 78% 82%,
+      rgba(var(--color-accent-secondary-rgb), 0.1),
+      transparent 36%
+    ),
+    var(--color-bg);
+}
+
+.summary-panel {
+  width: min(920px, 100%);
+}
+
+.summary-panel h1 {
+  max-width: 760px;
+  margin: 0;
+  font-size: clamp(34px, 5vw, 58px);
+  line-height: 1.08;
+}
+
+.summary-description {
+  max-width: 680px;
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+}
+
+.summary-metrics article {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 104px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(var(--color-surface-rgb), 0.72);
+}
+
+.summary-metrics span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.summary-metrics strong {
+  align-self: end;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.summary-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 46px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.summary-actions button:first-child {
+  border-color: transparent;
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.summary-footnote {
+  margin: var(--space-5) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
 @media (max-width: 639px) {
   .live-header {
     align-items: flex-start;
@@ -1077,6 +1182,15 @@
     border-bottom: 0;
     border-left: 0;
     border-radius: 8px 8px 0 0;
+  }
+
+  .summary-screen {
+    align-items: start;
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .summary-metrics {
+    grid-template-columns: 1fr;
   }
 
   .control-dock {

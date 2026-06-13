@@ -59,6 +59,9 @@ export function useSession(createOrchestrator?: CreateOrchestrator) {
     stopSession: () => {
       getOrchestrator().stop();
     },
+    resetSession: () => {
+      dispatch({ type: "RESET_SESSION" });
+    },
     protocolStage: defaultProtocolStage,
   };
 }
