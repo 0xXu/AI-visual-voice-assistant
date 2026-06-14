@@ -7,7 +7,7 @@
 <p align="center">面向持续变化的真实环境，让摄像头、语音和文字共享同一个对话上下文。</p>
 
 <p align="center">
-  <a href="https://github.com/0xXu"><strong>演示视频</strong></a>
+  <a href="https://demo.vectornest.space"><strong>演示视频</strong></a>
   ·
   <a href="./docs/DESIGN.md"><strong>设计文档</strong></a>
 </p>
@@ -35,10 +35,14 @@
 
 ## 演示
 
-- **演示视频（占位）**：[https://github.com/0xXu](https://github.com/0xXu)
+- **演示视频**：[https://demo.vectornest.space](https://demo.vectornest.space)
 - **设计文档**：[docs/DESIGN.md](./docs/DESIGN.md)
 
-> 当前链接暂作演示视频占位，正式视频发布后将替换。
+<p align="center">
+  <a href="https://demo.vectornest.space">
+    <img src="https://demo.vectornest.space/poster.jpg?v=20260614-0110" width="800" alt="播放 EchoSight 演示视频">
+  </a>
+</p>
 
 ---
 
