@@ -7,7 +7,6 @@
 <p align="center">面向持续变化的真实环境，让摄像头、语音和文字共享同一个对话上下文。</p>
 
 <p align="center">
-  <a href="https://demo.vectornest.space"><strong>演示视频</strong></a>
   ·
   <a href="./docs/DESIGN.md"><strong>设计文档</strong></a>
 </p>
