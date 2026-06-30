@@ -34,14 +34,8 @@
 
 ## 演示
 
-- **演示视频**：[https://demo.vectornest.space](https://demo.vectornest.space)
 - **设计文档**：[docs/DESIGN.md](./docs/DESIGN.md)
 
-<p align="center">
-  <a href="https://demo.vectornest.space">
-    <img src="https://demo.vectornest.space/poster.jpg?v=20260614-0110" width="800" alt="播放 EchoSight 演示视频">
-  </a>
-</p>
 
 ---
 
